@@ -1,34 +1,59 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { formatDisplayTime } from "@/lib/jamaat";
 import type { MosqueView, PrayerTimes } from "@/types/mosque";
 
 interface UpdateFormProps {
   mosque: MosqueView;
+  lastUpdatedDisplay: string;
+  createFromPlace?: {
+    placeId: string;
+    name: string;
+    latitude: number;
+    longitude: number;
+    address: string;
+    distanceFromRouteKm?: number;
+  };
 }
 
-export function UpdateForm({ mosque }: UpdateFormProps) {
+export function UpdateForm({ mosque, lastUpdatedDisplay, createFromPlace }: UpdateFormProps) {
+  const router = useRouter();
   const [prayers, setPrayers] = useState<PrayerTimes>({
-    fajr: mosque.prayers.fajr ?? "",
-    zuhr: mosque.prayers.zuhr ?? "",
-    asr: mosque.prayers.asr ?? "",
-    maghrib: mosque.prayers.maghrib ?? "",
-    isha: mosque.prayers.isha ?? "",
+    fajr: normalizeTimeForInput(mosque.prayers.fajr),
+    zuhr: normalizeTimeForInput(mosque.prayers.zuhr),
+    asr: normalizeTimeForInput(mosque.prayers.asr),
+    maghrib: normalizeTimeForInput(mosque.prayers.maghrib),
+    isha: normalizeTimeForInput(mosque.prayers.isha),
   });
-  const [juma1, setJuma1] = useState(mosque.juma1 ?? "");
-  const [juma2, setJuma2] = useState(mosque.juma2 ?? "");
+  const [juma1, setJuma1] = useState(normalizeTimeForInput(mosque.juma1));
+  const [juma2, setJuma2] = useState(normalizeTimeForInput(mosque.juma2));
   const [remarks, setRemarks] = useState(mosque.remarks ?? "");
   const [files, setFiles] = useState<File[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [postSuccessRedirect, setPostSuccessRedirect] = useState<string | null>(null);
 
-  const lastUpdatedText = useMemo(
-    () => new Date(mosque.lastUpdated).toLocaleString(),
-    [mosque.lastUpdated],
-  );
+  useEffect(() => {
+    if (!message) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      // Attempt to close the tab first (works when opened in a separate tab/window)
+      window.close();
+
+      // If browser blocks close (same-tab navigation, security policy), redirect gracefully
+      window.setTimeout(() => {
+        router.replace(postSuccessRedirect || "/");
+      }, 200);
+    }, 3000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [message, postSuccessRedirect, router]);
 
   function updatePrayer(key: keyof PrayerTimes, value: string) {
     setPrayers((current) => ({ ...current, [key]: value }));
@@ -55,17 +80,36 @@ export function UpdateForm({ mosque }: UpdateFormProps) {
       formData.set("remarks", remarks);
       files.forEach((file) => formData.append("images", file));
 
-      const response = await fetch(`/api/update/${mosque.qrToken}`, {
+      if (createFromPlace) {
+        formData.set("placeId", createFromPlace.placeId);
+        formData.set("name", createFromPlace.name);
+        formData.set("latitude", String(createFromPlace.latitude));
+        formData.set("longitude", String(createFromPlace.longitude));
+        formData.set("address", createFromPlace.address);
+        formData.set("distanceFromRouteKm", String(createFromPlace.distanceFromRouteKm ?? 0));
+      }
+
+      const endpoint = createFromPlace
+        ? "/api/mosques/create-and-update-from-place"
+        : `/api/update/${mosque.qrToken}`;
+
+      const response = await fetch(endpoint, {
         method: "POST",
         body: formData,
       });
-      const data = (await response.json()) as { message?: string; error?: string; warning?: string };
+      const data = (await response.json()) as {
+        message?: string;
+        error?: string;
+        warning?: string;
+        redirectTo?: string;
+      };
 
       if (!response.ok) {
         throw new Error(data.error || "Update failed.");
       }
 
       setMessage(data.warning ? `${data.message} ${data.warning}` : data.message || "Updated.");
+      setPostSuccessRedirect(createFromPlace ? data.redirectTo || "/" : "/");
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Update failed.");
     } finally {
@@ -86,7 +130,7 @@ export function UpdateForm({ mosque }: UpdateFormProps) {
           </p>
         </div>
         <div className="rounded-[20px] bg-stone-100 px-4 py-3 text-sm text-stone-600">
-          Last updated: {lastUpdatedText}
+          Last updated: {lastUpdatedDisplay}
         </div>
       </div>
 
@@ -115,6 +159,15 @@ export function UpdateForm({ mosque }: UpdateFormProps) {
             onChange={(event) => setJuma1(event.target.value)}
             className="min-h-12 w-full rounded-[16px] border border-amber-200 bg-white px-3 text-stone-900 focus:border-orange-400 focus:outline-none"
           />
+          {juma1 ? (
+            <button
+              type="button"
+              onClick={() => setJuma1("")}
+              className="text-left text-xs font-semibold text-amber-700 hover:text-amber-800"
+            >
+              Clear Juma 1
+            </button>
+          ) : null}
         </label>
         <label className="space-y-2 rounded-[22px] bg-amber-50 p-4">
           <span className="text-xs font-semibold uppercase tracking-[0.26em] text-amber-700">Juma 2</span>
@@ -124,6 +177,15 @@ export function UpdateForm({ mosque }: UpdateFormProps) {
             onChange={(event) => setJuma2(event.target.value)}
             className="min-h-12 w-full rounded-[16px] border border-amber-200 bg-white px-3 text-stone-900 focus:border-orange-400 focus:outline-none"
           />
+          {juma2 ? (
+            <button
+              type="button"
+              onClick={() => setJuma2("")}
+              className="text-left text-xs font-semibold text-amber-700 hover:text-amber-800"
+            >
+              Clear Juma 2
+            </button>
+          ) : null}
         </label>
       </div>
 
@@ -163,7 +225,12 @@ export function UpdateForm({ mosque }: UpdateFormProps) {
       </div>
 
       {message ? (
-        <div className="mt-4 rounded-[20px] bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</div>
+        <div className="mt-4 rounded-[20px] bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <p>{message}</p>
+          <p className="mt-1 text-xs text-emerald-700">
+            Success. This tab will close automatically in a few seconds.
+          </p>
+        </div>
       ) : null}
       {error ? (
         <div className="mt-4 rounded-[20px] bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
@@ -191,4 +258,45 @@ function getDeviceId() {
   const created = crypto.randomUUID();
   window.localStorage.setItem(key, created);
   return created;
+}
+
+function normalizeTimeForInput(value: string | null | undefined) {
+  if (!value) {
+    return "";
+  }
+
+  const raw = value.trim();
+  if (!raw) {
+    return "";
+  }
+
+  const hhmmOrHhmmss = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?(?:\.\d+)?$/);
+  if (hhmmOrHhmmss) {
+    const hours = Number(hhmmOrHhmmss[1]);
+    const minutes = Number(hhmmOrHhmmss[2]);
+    if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+      return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+    }
+  }
+
+  const ampm = raw.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (ampm) {
+    let hours = Number(ampm[1]);
+    const minutes = Number(ampm[2]);
+    const period = ampm[3].toUpperCase();
+
+    if (minutes < 0 || minutes > 59 || hours < 1 || hours > 12) {
+      return "";
+    }
+
+    if (period === "AM") {
+      hours = hours === 12 ? 0 : hours;
+    } else {
+      hours = hours === 12 ? 12 : hours + 12;
+    }
+
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  }
+
+  return "";
 }

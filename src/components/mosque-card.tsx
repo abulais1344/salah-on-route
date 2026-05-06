@@ -81,7 +81,7 @@ export function MosqueCard({ mosque, onAddTimings, isCreating = false }: MosqueC
             {nextJamaat.status}
           </span>
         ) : (
-          <span className="rounded-full bg-stone-700 px-3 py-2 text-xs font-semibold text-stone-200">
+          <span className="rounded-full bg-indigo-100 px-3 py-2 text-xs font-semibold text-indigo-700">
             Missing
           </span>
         )}
@@ -92,7 +92,7 @@ export function MosqueCard({ mosque, onAddTimings, isCreating = false }: MosqueC
           href={directionsUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex min-h-11 items-center rounded-full bg-orange-600 px-5 text-sm font-semibold text-white transition hover:bg-orange-700"
+          className="inline-flex min-h-11 items-center rounded-full bg-[linear-gradient(135deg,#4f46e5_0%,#315ae9_42%,#2563eb_100%)] px-5 text-sm font-semibold !text-white visited:!text-white shadow-[0_8px_18px_rgba(30,64,175,0.18)] transition hover:brightness-[0.98]"
         >
           Navigate
         </a>

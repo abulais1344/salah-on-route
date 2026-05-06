@@ -16,6 +16,58 @@ interface PlacesNearbyResult {
 interface PlacesNearbyResponse {
   status: string;
   results?: PlacesNearbyResult[];
+  next_page_token?: string;
+}
+
+interface PlacesFindPlaceCandidate {
+  place_id?: string;
+  name?: string;
+  formatted_address?: string;
+  geometry?: {
+    location?: {
+      lat: number;
+      lng: number;
+    };
+  };
+}
+
+interface PlacesFindPlaceResponse {
+  status: string;
+  candidates?: PlacesFindPlaceCandidate[];
+}
+
+interface PlaceDetailsResult {
+  place_id?: string;
+  name?: string;
+  formatted_address?: string;
+  geometry?: {
+    location?: {
+      lat: number;
+      lng: number;
+    };
+  };
+}
+
+interface PlaceDetailsResponse {
+  status: string;
+  result?: PlaceDetailsResult;
+}
+
+interface PlacesTextSearchResult {
+  place_id: string;
+  name: string;
+  formatted_address?: string;
+  geometry?: {
+    location?: {
+      lat: number;
+      lng: number;
+    };
+  };
+}
+
+interface PlacesTextSearchResponse {
+  status: string;
+  results?: PlacesTextSearchResult[];
 }
 
 interface CacheEntry {
@@ -39,6 +91,121 @@ const NEARBY_MAX_RESULTS = 35;
 const ROUTE_POINT_RADIUS_METERS = 2800;
 const ROUTE_PLACE_RESULTS_PER_POINT = 20;
 const ROUTE_DISTANCE_LIMIT_KM = 3;
+
+export async function resolveMosqueFromGoogleMapsUrl(rawUrl: string) {
+  const normalized = rawUrl.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const parsed = tryParseUrl(normalized);
+  if (!parsed) {
+    return null;
+  }
+
+  if (!isSupportedGoogleMapsHost(parsed.hostname)) {
+    return null;
+  }
+
+  const expandedUrl = await expandGoogleMapsUrl(parsed.toString());
+  const candidateUrl = tryParseUrl(expandedUrl) ?? parsed;
+  const apiKey =
+    process.env.GOOGLE_MAPS_SERVER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+  if (!apiKey) {
+    return null;
+  }
+
+  const directPlaceId = extractPlaceIdFromText(`${expandedUrl} ${candidateUrl.search}`);
+  if (directPlaceId) {
+    const fromDetails = await fetchPlaceByPlaceId(directPlaceId, apiKey);
+    if (fromDetails) {
+      return fromDetails;
+    }
+  }
+
+  const nameFromPath = extractNameFromMapsPath(candidateUrl.pathname);
+  const coordinatesFromPath = extractCoordinatesFromMapsUrl(expandedUrl);
+  const fallbackQueries = [
+    nameFromPath && coordinatesFromPath
+      ? `${nameFromPath} ${coordinatesFromPath.latitude},${coordinatesFromPath.longitude}`
+      : null,
+    nameFromPath,
+    expandedUrl,
+  ].filter((query): query is string => Boolean(query && query.trim().length > 0));
+
+  for (const query of fallbackQueries) {
+    const resolved = await findPlaceFromText(query, apiKey, coordinatesFromPath);
+    if (resolved) {
+      return resolved;
+    }
+  }
+
+  return null;
+}
+
+export async function searchMosquesByName(
+  query: string,
+  options?: { center?: GeoPoint; radiusKm?: number; limit?: number },
+) {
+  const trimmed = query.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  const apiKey =
+    process.env.GOOGLE_MAPS_SERVER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  if (!apiKey) {
+    return [];
+  }
+
+  const url = new URL("https://maps.googleapis.com/maps/api/place/textsearch/json");
+  url.searchParams.set("key", apiKey);
+  url.searchParams.set("query", `${trimmed} mosque`);
+
+  if (options?.center) {
+    url.searchParams.set("location", `${options.center.latitude},${options.center.longitude}`);
+    const radiusMeters = Math.max(1000, Math.min(50000, Math.floor((options.radiusKm ?? 20) * 1000)));
+    url.searchParams.set("radius", String(radiusMeters));
+  }
+
+  const response = await fetch(url.toString(), { cache: "no-store" });
+  if (!response.ok) {
+    return [];
+  }
+
+  const payload = (await response.json()) as PlacesTextSearchResponse;
+  if (payload.status === "REQUEST_DENIED") {
+    throw new Error(
+      "Google Places request denied. Use GOOGLE_MAPS_SERVER_API_KEY without HTTP referrer restriction for server-side discovery.",
+    );
+  }
+
+  if (payload.status !== "OK" || !payload.results) {
+    return [];
+  }
+
+  const limit = Math.min(12, Math.max(1, options?.limit ?? 6));
+  return payload.results.slice(0, limit).flatMap((result) => {
+    const latitude = result.geometry?.location?.lat;
+    const longitude = result.geometry?.location?.lng;
+
+    if (!result.place_id || typeof latitude !== "number" || typeof longitude !== "number") {
+      return [];
+    }
+
+    return [{
+      placeId: result.place_id,
+      name: result.name,
+      latitude,
+      longitude,
+      address: result.formatted_address || "Address unavailable",
+      distanceFromRouteKm: options?.center
+        ? haversineDistanceKm(options.center, { latitude, longitude })
+        : 0,
+    }];
+  });
+}
 
 export async function searchNearbyMosques(center: GeoPoint, radiusKm: number) {
   const key = `nearby:${toGridKey(center, NEARBY_GRID_METERS)}:${toRadiusBucket(radiusKm, 0.5)}`;
@@ -190,27 +357,55 @@ async function fetchNearbyPlacesFromGoogle(params: {
   url.searchParams.set("radius", String(params.radiusMeters));
   url.searchParams.set("keyword", "mosque");
 
-  const response = await fetch(url.toString(), { cache: "no-store" });
-  if (!response.ok) {
-    return [];
+  const collected: PlacesNearbyResult[] = [];
+  let nextPageToken: string | undefined;
+
+  // Google Nearby Search returns up to 20 results per page; follow next_page_token for broader coverage.
+  for (let page = 0; page < 3; page += 1) {
+    const pageUrl = new URL(url.toString());
+    if (nextPageToken) {
+      pageUrl.searchParams.set("pagetoken", nextPageToken);
+      // Token activation can take a short moment after the previous response.
+      await new Promise((resolve) => {
+        setTimeout(resolve, 1800);
+      });
+    }
+
+    const response = await fetch(pageUrl.toString(), { cache: "no-store" });
+    if (!response.ok) {
+      break;
+    }
+
+    const payload = (await response.json()) as PlacesNearbyResponse;
+    if (payload.status === "REQUEST_DENIED") {
+      throw new Error(
+        "Google Places request denied. Use GOOGLE_MAPS_SERVER_API_KEY without HTTP referrer restriction for server-side discovery.",
+      );
+    }
+
+    if (payload.status === "INVALID_REQUEST" && nextPageToken) {
+      continue;
+    }
+
+    if (payload.status !== "OK" || !payload.results) {
+      if (page === 0) {
+        placesQueryCache.set(cacheKey, {
+          value: [],
+          expiresAt: Date.now() + PLACES_QUERY_CACHE_TTL_MS,
+        });
+      }
+      break;
+    }
+
+    collected.push(...payload.results);
+    nextPageToken = payload.next_page_token;
+
+    if (!nextPageToken || collected.length >= Math.max(params.maxResults, NEARBY_MAX_RESULTS)) {
+      break;
+    }
   }
 
-  const payload = (await response.json()) as PlacesNearbyResponse;
-  if (payload.status === "REQUEST_DENIED") {
-    throw new Error(
-      "Google Places request denied. Use GOOGLE_MAPS_SERVER_API_KEY without HTTP referrer restriction for server-side discovery.",
-    );
-  }
-
-  if (!payload.results || payload.status !== "OK") {
-    placesQueryCache.set(cacheKey, {
-      value: [],
-      expiresAt: Date.now() + PLACES_QUERY_CACHE_TTL_MS,
-    });
-    return [];
-  }
-
-  const trimmed = payload.results.slice(0, Math.max(params.maxResults, NEARBY_MAX_RESULTS));
+  const trimmed = collected.slice(0, Math.max(params.maxResults, NEARBY_MAX_RESULTS));
   placesQueryCache.set(cacheKey, {
     value: trimmed,
     expiresAt: Date.now() + PLACES_QUERY_CACHE_TTL_MS,
@@ -303,4 +498,151 @@ function toGridKey(point: GeoPoint, gridMeters: number) {
 function toRadiusBucket(radiusKm: number, bucketKm: number) {
   const safeRadius = Math.max(1, radiusKm);
   return (Math.round(safeRadius / bucketKm) * bucketKm).toFixed(1);
+}
+
+function tryParseUrl(input: string) {
+  try {
+    return new URL(input);
+  } catch {
+    return null;
+  }
+}
+
+function isSupportedGoogleMapsHost(hostname: string) {
+  const host = hostname.toLowerCase();
+  return host === "maps.app.goo.gl" || host.endsWith("google.com") || host.endsWith("google.co.in");
+}
+
+async function expandGoogleMapsUrl(url: string) {
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      redirect: "follow",
+      cache: "no-store",
+    });
+
+    return response.url || url;
+  } catch {
+    return url;
+  }
+}
+
+function extractPlaceIdFromText(value: string) {
+  const match = value.match(/ChI[\w-]{8,}/);
+  return match?.[0] ?? null;
+}
+
+function extractNameFromMapsPath(pathname: string) {
+  const marker = "/maps/place/";
+  const index = pathname.indexOf(marker);
+  if (index === -1) {
+    return null;
+  }
+
+  const remaining = pathname.slice(index + marker.length);
+  const firstSegment = remaining.split("/")[0];
+  if (!firstSegment) {
+    return null;
+  }
+
+  return decodeURIComponent(firstSegment).replace(/\+/g, " ").trim();
+}
+
+function extractCoordinatesFromMapsUrl(value: string) {
+  const match = value.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    latitude: Number(match[1]),
+    longitude: Number(match[2]),
+  };
+}
+
+async function fetchPlaceByPlaceId(placeId: string, apiKey: string) {
+  const url = new URL("https://maps.googleapis.com/maps/api/place/details/json");
+  url.searchParams.set("key", apiKey);
+  url.searchParams.set("place_id", placeId);
+  url.searchParams.set("fields", "place_id,name,formatted_address,geometry");
+
+  const response = await fetch(url.toString(), { cache: "no-store" });
+  if (!response.ok) {
+    return null;
+  }
+
+  const payload = (await response.json()) as PlaceDetailsResponse;
+  if (payload.status === "REQUEST_DENIED") {
+    throw new Error(
+      "Google Places request denied. Use GOOGLE_MAPS_SERVER_API_KEY without HTTP referrer restriction for server-side discovery.",
+    );
+  }
+
+  const result = payload.result;
+  const latitude = result?.geometry?.location?.lat;
+  const longitude = result?.geometry?.location?.lng;
+  const resolvedPlaceId = result?.place_id;
+  const name = result?.name;
+
+  if (!resolvedPlaceId || !name || typeof latitude !== "number" || typeof longitude !== "number") {
+    return null;
+  }
+
+  return {
+    placeId: resolvedPlaceId,
+    name,
+    latitude,
+    longitude,
+    address: result.formatted_address || "Address unavailable",
+    distanceFromRouteKm: 0,
+  };
+}
+
+async function findPlaceFromText(
+  query: string,
+  apiKey: string,
+  locationBias?: { latitude: number; longitude: number } | null,
+) {
+  const url = new URL("https://maps.googleapis.com/maps/api/place/findplacefromtext/json");
+  url.searchParams.set("key", apiKey);
+  url.searchParams.set("input", query);
+  url.searchParams.set("inputtype", "textquery");
+  url.searchParams.set("fields", "place_id,name,formatted_address,geometry");
+  if (locationBias) {
+    url.searchParams.set(
+      "locationbias",
+      `point:${locationBias.latitude},${locationBias.longitude}`,
+    );
+  }
+
+  const response = await fetch(url.toString(), { cache: "no-store" });
+  if (!response.ok) {
+    return null;
+  }
+
+  const payload = (await response.json()) as PlacesFindPlaceResponse;
+  if (payload.status === "REQUEST_DENIED") {
+    throw new Error(
+      "Google Places request denied. Use GOOGLE_MAPS_SERVER_API_KEY without HTTP referrer restriction for server-side discovery.",
+    );
+  }
+
+  const candidate = payload.candidates?.[0];
+  const latitude = candidate?.geometry?.location?.lat;
+  const longitude = candidate?.geometry?.location?.lng;
+  const placeId = candidate?.place_id;
+  const name = candidate?.name;
+
+  if (!placeId || !name || typeof latitude !== "number" || typeof longitude !== "number") {
+    return null;
+  }
+
+  return {
+    placeId,
+    name,
+    latitude,
+    longitude,
+    address: candidate.formatted_address || "Address unavailable",
+    distanceFromRouteKm: 0,
+  };
 }

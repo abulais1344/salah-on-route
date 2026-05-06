@@ -1,0 +1,37 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="pinBody" x1="98" y1="72" x2="420" y2="438" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2D86E0"/>
+      <stop offset="0.48" stop-color="#0E63BA"/>
+      <stop offset="1" stop-color="#0A3F7A"/>
+    </linearGradient>
+    <linearGradient id="pinSheen" x1="140" y1="116" x2="296" y2="330" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#C7E5FF" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#C7E5FF" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="disc" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(256 194) rotate(90) scale(112)">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F4F9FF"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="180" y1="122" x2="332" y2="262" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F8D37A"/>
+      <stop offset="1" stop-color="#D7A73F"/>
+    </linearGradient>
+  </defs>
+  <path d="M256 44C152.2 44 68 128.2 68 232C68 334.8 145.9 406.1 233.3 476C246.5 486.6 265.5 486.6 278.7 476C366.1 406.1 444 334.8 444 232C444 128.2 359.8 44 256 44Z" fill="url(#pinBody)"/>
+  <path d="M256 44C152.2 44 68 128.2 68 232C68 334.8 145.9 406.1 233.3 476V44.4C240.6 44.1 248.2 44 256 44Z" fill="url(#pinSheen)"/>
+  <circle cx="256" cy="194" r="112" fill="url(#disc)"/>
+  <circle cx="256" cy="194" r="108" stroke="#D9EAFE" stroke-width="2"/>
+  <circle cx="256" cy="194" r="104" stroke="url(#gold)" stroke-opacity="0.45" stroke-width="1.5"/>
+  <g fill="#0A3F7A">
+    <path d="M193 292V216C193 180.1 222.1 151 258 151C293.9 151 323 180.1 323 216V292H304V217C304 191.6 283.4 171 258 171C232.6 171 212 191.6 212 217V292H193Z"/>
+    <rect x="190" y="286" width="136" height="54" rx="10"/>
+    <rect x="174" y="178" width="14" height="102" rx="7"/>
+    <rect x="328" y="178" width="14" height="102" rx="7"/>
+    <rect x="171" y="165" width="20" height="12" rx="6"/>
+    <rect x="325" y="165" width="20" height="12" rx="6"/>
+  </g>
+  <path d="M236 340V304C236 292.95 244.95 284 256 284C267.05 284 276 292.95 276 304V340H236Z" fill="#FFFFFF"/>
+  <path d="M259 127C270.9 110.9 291 105.1 310.8 113C294.5 118.3 286.1 131.2 288.2 151.9C272.4 150.4 263.3 142.1 259 127Z" fill="url(#gold)"/>
+  <circle cx="292.5" cy="121" r="5" fill="url(#gold)"/>
+</svg>

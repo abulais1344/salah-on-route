@@ -1,4 +1,4 @@
-import { getMosqueByQrToken, updateMosqueByQrToken } from "@/lib/mosques";
+import { createMosqueFromDiscoveredPlace, updateMosqueByQrToken } from "@/lib/mosques";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,26 +10,19 @@ const MAX_FILE_COUNT = 5;
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 20 * 1024 * 1024;
 
-export async function GET(
-  _request: Request,
-  context: RouteContext<"/api/update/[qrToken]">,
-) {
-  const { qrToken } = await context.params;
-  const mosque = await getMosqueByQrToken(qrToken);
-
-  if (!mosque) {
-    return Response.json({ error: "Mosque not found." }, { status: 404 });
-  }
-
-  return Response.json({ mosque });
-}
-
-export async function POST(
-  request: Request,
-  context: RouteContext<"/api/update/[qrToken]">,
-) {
-  const { qrToken } = await context.params;
+export async function POST(request: Request) {
   const formData = await request.formData();
+
+  const placeId = String(formData.get("placeId") || "").trim();
+  const name = String(formData.get("name") || "").trim();
+  const latitude = Number(formData.get("latitude"));
+  const longitude = Number(formData.get("longitude"));
+  const address = String(formData.get("address") || "Address unavailable").trim();
+  const distanceFromRouteKm = Number(formData.get("distanceFromRouteKm") || 0);
+
+  if (!placeId || !name || Number.isNaN(latitude) || Number.isNaN(longitude)) {
+    return Response.json({ error: "Invalid mosque payload." }, { status: 400 });
+  }
 
   const deviceId = normalizeDeviceId(formData.get("deviceId"));
   const remarks = normalizeRemarks(formData.get("remarks"));
@@ -68,6 +61,15 @@ export async function POST(
     return Response.json({ error: "Set Juma 1 before adding Juma 2." }, { status: 400 });
   }
 
+  const hasAnyTimingDetails =
+    Boolean(prayers.fajr) ||
+    Boolean(prayers.zuhr) ||
+    Boolean(prayers.asr) ||
+    Boolean(prayers.maghrib) ||
+    Boolean(prayers.isha) ||
+    Boolean(juma1) ||
+    Boolean(juma2);
+
   const files = formData
     .getAll("images")
     .filter((entry): entry is File => entry instanceof File && entry.size > 0)
@@ -78,8 +80,32 @@ export async function POST(
     return Response.json({ error: filesValidationError }, { status: 400 });
   }
 
-  const result = await updateMosqueByQrToken(
-    qrToken,
+  if (!hasAnyTimingDetails) {
+    return Response.json(
+      { error: "Add at least one prayer or Juma timing before submitting." },
+      { status: 400 },
+    );
+  }
+
+  const createResult = await createMosqueFromDiscoveredPlace({
+    placeId,
+    name,
+    latitude,
+    longitude,
+    address,
+    distanceFromRouteKm: Number.isNaN(distanceFromRouteKm) ? 0 : distanceFromRouteKm,
+  });
+
+  if ("error" in createResult) {
+    return Response.json({ error: createResult.error }, { status: createResult.status });
+  }
+
+  if (!createResult.mosque?.qrToken) {
+    return Response.json({ error: "Unable to open update flow for mosque." }, { status: 500 });
+  }
+
+  const updateResult = await updateMosqueByQrToken(
+    createResult.mosque.qrToken,
     {
       deviceId,
       prayers,
@@ -90,17 +116,18 @@ export async function POST(
     files,
   );
 
-  if ("error" in result) {
-    return Response.json({ error: result.error }, { status: result.status });
+  if ("error" in updateResult) {
+    return Response.json({ error: updateResult.error }, { status: updateResult.status });
   }
 
   return Response.json({
-    mosque: result.mosque,
-    warning: "warning" in result ? result.warning : undefined,
+    mosque: updateResult.mosque,
+    warning: "warning" in updateResult ? updateResult.warning : undefined,
     message:
-      result.persistence === "supabase"
+      updateResult.persistence === "supabase"
         ? "Mosque timings updated successfully."
         : "Mosque timings updated in demo mode.",
+    redirectTo: `/update/${createResult.mosque.qrToken}?edit=1`,
   });
 }
 

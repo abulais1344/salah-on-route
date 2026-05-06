@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { formatDisplayTime } from "@/lib/jamaat";
 import { UpdateForm } from "@/components/update-form";
 import { getMosqueByQrToken } from "@/lib/mosques";
+import type { MosqueView } from "@/types/mosque";
 
 export const dynamic = "force-dynamic";
 
@@ -12,16 +13,78 @@ export default async function UpdatePage({
   searchParams,
 }: {
   params: Promise<{ qrToken: string }>;
-  searchParams: Promise<{ edit?: string }>;
+  searchParams: Promise<{
+    edit?: string;
+    placeId?: string;
+    name?: string;
+    latitude?: string;
+    longitude?: string;
+    address?: string;
+    distanceFromRouteKm?: string;
+  }>;
 }) {
   const { qrToken } = await params;
-  const { edit } = await searchParams;
+  const {
+    edit,
+    placeId,
+    name,
+    latitude,
+    longitude,
+    address,
+    distanceFromRouteKm,
+  } = await searchParams;
   const isEditing = edit === "1";
-  const mosque = await getMosqueByQrToken(qrToken);
+  const existingMosque = await getMosqueByQrToken(qrToken);
+
+  const isDraftMode =
+    !existingMosque &&
+    qrToken === "new" &&
+    isEditing &&
+    Boolean(placeId && name && latitude && longitude);
+
+  const draftLatitude = Number(latitude);
+  const draftLongitude = Number(longitude);
+  const draftDistance = Number(distanceFromRouteKm ?? "0");
+
+  const draftMosque: MosqueView | null = isDraftMode
+    ? {
+        id: `draft-${placeId}`,
+        name: name as string,
+        latitude: Number.isNaN(draftLatitude) ? 0 : draftLatitude,
+        longitude: Number.isNaN(draftLongitude) ? 0 : draftLongitude,
+        placeId: placeId as string,
+        address: address || "Address unavailable",
+        qrToken: "draft",
+        prayers: {
+          fajr: null,
+          zuhr: null,
+          asr: null,
+          maghrib: null,
+          isha: null,
+        },
+        juma1: null,
+        juma2: null,
+        remarks: null,
+        lastUpdated: new Date(0).toISOString(),
+        isVerified: false,
+        images: [],
+        hasJamaatData: false,
+        nextJamaat: null,
+        updatedAgo: "Not updated yet",
+        distanceFromRouteKm: Number.isNaN(draftDistance) ? 0 : draftDistance,
+      }
+    : null;
+
+  const mosque = existingMosque || draftMosque;
 
   if (!mosque) {
     notFound();
   }
+
+  const lastUpdatedDisplay =
+    isDraftMode || !existingMosque
+      ? "Not updated yet"
+      : new Date(mosque.lastUpdated).toLocaleString();
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#fff7ed_0%,#fafaf9_32%,#f5f5f4_100%)] px-4 py-8 sm:px-6 lg:px-8">
@@ -74,13 +137,28 @@ export default async function UpdatePage({
           <div>
             <div className="mb-3">
               <Link
-                href={`/update/${mosque.qrToken}`}
+                href={isDraftMode ? "/" : `/update/${mosque.qrToken}`}
                 className="inline-flex min-h-10 items-center rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-700 transition hover:bg-white"
               >
-                Back to summary
+                {isDraftMode ? "Back to map" : "Back to summary"}
               </Link>
             </div>
-            <UpdateForm mosque={mosque} />
+            <UpdateForm
+              mosque={mosque}
+              lastUpdatedDisplay={lastUpdatedDisplay}
+              createFromPlace={
+                isDraftMode
+                  ? {
+                      placeId: placeId as string,
+                      name: name as string,
+                      latitude: Number.isNaN(draftLatitude) ? 0 : draftLatitude,
+                      longitude: Number.isNaN(draftLongitude) ? 0 : draftLongitude,
+                      address: address || "Address unavailable",
+                      distanceFromRouteKm: Number.isNaN(draftDistance) ? 0 : draftDistance,
+                    }
+                  : undefined
+              }
+            />
           </div>
         )}
       </div>
