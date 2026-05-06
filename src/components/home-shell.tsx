@@ -27,6 +27,7 @@ interface PlaceSuggestion {
 
 const AUTOCOMPLETE_MIN_CHARS = 4;
 const AUTOCOMPLETE_DEBOUNCE_MS = 450;
+const LOCATION_PROMPT_DISMISSED_KEY = "namaz-route-location-prompt-dismissed-v1";
 
 export function HomeShell() {
   const router = useRouter();
@@ -44,6 +45,8 @@ export function HomeShell() {
   );
   const [nearbyNotice, setNearbyNotice] = useState<string | null>(null);
   const [nearbySource, setNearbySource] = useState<NearbySource>("featured");
+  const [isLocationBlocked, setIsLocationBlocked] = useState(false);
+  const [showLocationPrompt, setShowLocationPrompt] = useState(false);
   const [nearbyAreaLabel, setNearbyAreaLabel] = useState("your area");
   const [journeyPlan, setJourneyPlan] = useState<JourneyPrayerStop[]>([]);
   const [isNearbyLoading, setIsNearbyLoading] = useState(false);
@@ -128,6 +131,60 @@ export function HomeShell() {
     void loadFeaturedMosques();
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function prepareLocationPrompt() {
+      if (typeof window === "undefined") {
+        return;
+      }
+
+      const dismissed = window.localStorage.getItem(LOCATION_PROMPT_DISMISSED_KEY) === "1";
+      if (dismissed || !("geolocation" in navigator)) {
+        return;
+      }
+
+      try {
+        if (!navigator.permissions?.query) {
+          if (!cancelled) {
+            setShowLocationPrompt(true);
+          }
+          return;
+        }
+
+        const permission = await navigator.permissions.query({ name: "geolocation" as PermissionName });
+
+        if (cancelled) {
+          return;
+        }
+
+        if (permission.state === "granted") {
+          setShowLocationPrompt(false);
+          setIsLocationBlocked(false);
+          return;
+        }
+
+        if (permission.state === "denied") {
+          setShowLocationPrompt(false);
+          setIsLocationBlocked(true);
+          return;
+        }
+
+        setShowLocationPrompt(true);
+      } catch {
+        if (!cancelled) {
+          setShowLocationPrompt(true);
+        }
+      }
+    }
+
+    void prepareLocationPrompt();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const visibleMosques = useMemo(
     () => (mode === "nearby" ? nearbyMosques : routeMosques),
     [mode, nearbyMosques, routeMosques],
@@ -183,6 +240,7 @@ export function HomeShell() {
   async function loadNearbyMosques(location: GeoPoint, source: NearbySource) {
     setIsNearbyLoading(true);
     setNearbyNotice(null);
+    setIsLocationBlocked(false);
     setCurrentLocation(location);
     setNearbySource(source);
 
@@ -208,9 +266,11 @@ export function HomeShell() {
     }
   }
 
-  async function loadFeaturedMosques() {
+  async function loadFeaturedMosques(options?: { preserveNotice?: boolean }) {
     setIsNearbyLoading(true);
-    setNearbyNotice(null);
+    if (!options?.preserveNotice) {
+      setNearbyNotice(null);
+    }
     setCurrentLocation(null);
     setNearbySource("featured");
     setNearbyAreaLabel("your area");
@@ -327,18 +387,27 @@ export function HomeShell() {
   }
 
   async function handleUseCurrentLocation() {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(LOCATION_PROMPT_DISMISSED_KEY, "1");
+    }
+    setShowLocationPrompt(false);
+
     if (currentLocation && nearbySource === "current") {
+      setIsLocationBlocked(false);
       await loadNearbyMosques(currentLocation, "current");
       return;
     }
 
     if (!("geolocation" in navigator)) {
+      setIsLocationBlocked(true);
+      setNearbyNotice("Location is not supported on this device/browser. You can still browse added masjids.");
       await loadFeaturedMosques();
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        setIsLocationBlocked(false);
         const location = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
@@ -346,7 +415,11 @@ export function HomeShell() {
         void loadNearbyMosques(location, "current");
       },
       () => {
-        void loadFeaturedMosques();
+        setIsLocationBlocked(true);
+        setNearbyNotice(
+          "Location access is blocked. You can still browse added masjids.",
+        );
+        void loadFeaturedMosques({ preserveNotice: true });
       },
       { enableHighAccuracy: true, timeout: 10000 },
     );
@@ -538,6 +611,33 @@ export function HomeShell() {
       </section>
 
       <section className="sticky top-2 z-20 rounded-[24px] border border-stone-200 bg-white/95 p-3 shadow-[0_12px_40px_rgba(41,37,36,0.08)] backdrop-blur">
+        {mode === "nearby" && showLocationPrompt && nearbySource !== "current" ? (
+          <div className="mb-3 rounded-[14px] border border-orange-200 bg-orange-50 px-3 py-2.5 text-xs text-stone-700">
+            <p className="font-medium text-stone-800">Enable location for best nearby results</p>
+            <p className="mt-1 text-stone-600">
+              Your browser controls access (allow once, allow while using site, or block anytime).
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void handleUseCurrentLocation()}
+                className="rounded-full bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-orange-600"
+              >
+                Enable location
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  window.localStorage.setItem(LOCATION_PROMPT_DISMISSED_KEY, "1");
+                  setShowLocationPrompt(false);
+                }}
+                className="rounded-full border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 transition hover:bg-stone-100"
+              >
+                Not now
+              </button>
+            </div>
+          </div>
+        ) : null}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[0.8fr_1.2fr]">
           <div className="grid grid-cols-2 gap-2">
             <button
@@ -588,6 +688,18 @@ export function HomeShell() {
                     We ask location only to find nearby masjids. You can continue with browse mode anytime.
                   </p>
                 ) : null}
+                {isLocationBlocked ? (
+                  <div className="mb-1 flex items-center justify-between gap-2 px-1">
+                    <p className="text-[11px] text-rose-700">Location blocked. You can retry anytime.</p>
+                    <button
+                      type="button"
+                      onClick={() => void handleUseCurrentLocation()}
+                      className="text-[11px] font-semibold text-orange-700 hover:text-orange-800"
+                    >
+                      Retry location
+                    </button>
+                  </div>
+                ) : null}
                 <div className="grid w-full grid-cols-2 gap-2">
                   <button
                     type="button"
@@ -603,7 +715,7 @@ export function HomeShell() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (nearbySource !== "featured") void loadFeaturedMosques();
+                      void loadFeaturedMosques();
                     }}
                     disabled={hasNoAddedMasjids}
                     className={`min-h-11 rounded-full border px-3 text-sm font-semibold shadow-sm transition ${

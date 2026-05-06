@@ -1,10 +1,15 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { formatAddressForDisplay } from "@/lib/address";
-import { formatDisplayTime, formatPrayerLabel, getStatusTone } from "@/lib/jamaat";
+import {
+  formatDisplayTime,
+  formatPrayerLabel,
+  getNextJamaat,
+  getStatusTone,
+} from "@/lib/jamaat";
 import { getGoogleMapsDirectionsUrl } from "@/lib/maps-links";
 import type { MosqueView } from "@/types/mosque";
 
@@ -17,6 +22,10 @@ interface MosqueCardProps {
 export function MosqueCard({ mosque, onAddTimings, isCreating = false }: MosqueCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const directionsUrl = getGoogleMapsDirectionsUrl(mosque);
+  const nextJamaat = useMemo(
+    () => (mosque.hasJamaatData ? getNextJamaat(mosque.prayers, new Date()) : null),
+    [mosque.hasJamaatData, mosque.prayers],
+  );
 
   return (
     <article className="rounded-[26px] border border-stone-200 bg-white p-4 shadow-[0_12px_40px_rgba(41,37,36,0.08)] sm:p-5">
@@ -47,16 +56,16 @@ export function MosqueCard({ mosque, onAddTimings, isCreating = false }: MosqueC
       <div className="mt-4 flex items-center justify-between gap-3 rounded-[20px] bg-stone-950 px-4 py-3 text-stone-50">
         <div>
           <p className="text-[11px] uppercase tracking-[0.24em] text-stone-400">Next نماز</p>
-          {mosque.nextJamaat ? (
+          {nextJamaat ? (
             <>
               <p className="mt-1 text-base font-semibold sm:text-lg">
-                {formatPrayerLabel(mosque.nextJamaat.prayer)}{" "}
-                {mosque.nextJamaat.relativeText}
-                {!mosque.nextJamaat.isTomorrow && mosque.nextJamaat.status !== "Missed" && (
-                  <span className="ml-1 font-normal text-stone-400 text-sm">• {mosque.nextJamaat.urgencyLabel}</span>
+                {formatPrayerLabel(nextJamaat.prayer)}{" "}
+                {nextJamaat.relativeText}
+                {!nextJamaat.isTomorrow && nextJamaat.status !== "Missed" && (
+                  <span className="ml-1 text-sm font-normal text-stone-400">• {nextJamaat.urgencyLabel}</span>
                 )}
               </p>
-              <p className="text-xs text-stone-300">{mosque.nextJamaat.displayTime}</p>
+              <p className="text-xs text-stone-300">{nextJamaat.displayTime}</p>
             </>
           ) : (
             <>
@@ -65,11 +74,11 @@ export function MosqueCard({ mosque, onAddTimings, isCreating = false }: MosqueC
             </>
           )}
         </div>
-        {mosque.nextJamaat ? (
+        {nextJamaat ? (
           <span
-            className={`rounded-full px-3 py-2 text-xs font-semibold ${getStatusTone(mosque.nextJamaat.status)}`}
+            className={`rounded-full px-3 py-2 text-xs font-semibold ${getStatusTone(nextJamaat.status)}`}
           >
-            {mosque.nextJamaat.status}
+            {nextJamaat.status}
           </span>
         ) : (
           <span className="rounded-full bg-stone-700 px-3 py-2 text-xs font-semibold text-stone-200">
