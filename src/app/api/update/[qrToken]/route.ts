@@ -134,7 +134,7 @@ function validateFiles(files: File[]) {
   let totalBytes = 0;
 
   for (const file of files) {
-    if (!file.type.startsWith("image/")) {
+    if (!isLikelyImageFile(file)) {
       return "Only image uploads are supported.";
     }
 
@@ -150,6 +150,27 @@ function validateFiles(files: File[]) {
   }
 
   return null;
+}
+
+function isLikelyImageFile(file: File) {
+  if (file.type.startsWith("image/")) {
+    return true;
+  }
+
+  const lowerName = file.name.toLowerCase();
+  return [
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".webp",
+    ".gif",
+    ".bmp",
+    ".tif",
+    ".tiff",
+    ".heic",
+    ".heif",
+    ".avif",
+  ].some((extension) => lowerName.endsWith(extension));
 }
 
 function normalizeTimeBySlot(value: string | null, slot: "am" | "pm") {

@@ -387,38 +387,51 @@ async function updateSupabaseMosque(
   }
 
   const uploadedImages: MosqueImage[] = [];
+  const uploadErrors: string[] = [];
   if (files.length > 0) {
     const bucket = getStorageBucket();
 
     for (const file of files.slice(0, 5)) {
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-      const filePath = `${mosqueId}/${Date.now()}-${safeName}`;
-      const uploadResult = await supabase.storage
-        .from(bucket)
-        .upload(filePath, file, {
-          contentType: file.type || "application/octet-stream",
-          upsert: false,
-        });
+      try {
+        const preparedUpload = await prepareImageForUpload(file);
+        const safeName = preparedUpload.fileName.replace(/[^a-zA-Z0-9._-]/g, "-");
+        const filePath = `${mosqueId}/${Date.now()}-${safeName}`;
+        
+        const uploadResult = await supabase.storage
+          .from(bucket)
+          .upload(filePath, preparedUpload.data, {
+            contentType: preparedUpload.contentType,
+            upsert: false,
+          });
 
-      if (uploadResult.error) {
-        continue;
-      }
+        if (uploadResult.error) {
+          console.error(`Image upload failed for ${file.name}:`, uploadResult.error);
+          uploadErrors.push(`Failed to upload ${preparedUpload.fileName}`);
+          continue;
+        }
 
-      const publicUrl = supabase.storage.from(bucket).getPublicUrl(filePath).data.publicUrl;
-      const imageInsert = await supabase.from("mosque_images").insert({
-        mosque_id: mosqueId,
-        image_url: publicUrl,
-        type: "general",
-      }).select("*").single();
+        const publicUrl = supabase.storage.from(bucket).getPublicUrl(filePath).data.publicUrl;
+        const imageInsert = await supabase.from("mosque_images").insert({
+          mosque_id: mosqueId,
+          image_url: publicUrl,
+          type: "general",
+        }).select("*").single();
 
-      if (!imageInsert.error && imageInsert.data) {
-        const row = imageInsert.data as MosqueImageRow;
-        uploadedImages.push({
-          id: row.id,
-          mosqueId: row.mosque_id,
-          imageUrl: row.image_url,
-          type: row.type,
-        });
+        if (!imageInsert.error && imageInsert.data) {
+          const row = imageInsert.data as MosqueImageRow;
+          uploadedImages.push({
+            id: row.id,
+            mosqueId: row.mosque_id,
+            imageUrl: row.image_url,
+            type: row.type,
+          });
+        } else {
+          console.error(`Image database insert failed for ${file.name}:`, imageInsert.error);
+          uploadErrors.push(`Failed to save ${preparedUpload.fileName} to database`);
+        }
+      } catch (fileError) {
+        console.error(`Error processing file ${file.name}:`, fileError);
+        uploadErrors.push(`Error processing ${file.name}`);
       }
     }
   }
@@ -436,7 +449,117 @@ async function updateSupabaseMosque(
     persistence: "supabase" as const,
     uploadedImages,
     status: 200 as const,
+    ...(uploadErrors.length > 0 && { 
+      warning: `Uploaded ${uploadedImages.length} of ${files.length} images. ${uploadErrors.join("; ")}`
+    }),
   };
+}
+
+async function prepareImageForUpload(file: File) {
+  if (isHeicLikeFile(file)) {
+    const converted = await convertHeicToJpeg(file);
+    if (converted) {
+      return converted;
+    }
+  }
+
+  return {
+    data: file,
+    contentType: inferUploadContentType(file),
+    fileName: file.name,
+  };
+}
+
+async function convertHeicToJpeg(file: File) {
+  try {
+    const heicConvertModule = await import("heic-convert");
+    const heicConvert = heicConvertModule.default;
+    const inputBuffer = Buffer.from(await file.arrayBuffer());
+
+    const converted = await heicConvert({
+      buffer: inputBuffer,
+      format: "JPEG",
+      quality: 0.9,
+    });
+
+    // Handle different return types from heic-convert
+    let bytes: Uint8Array;
+    if (converted instanceof Uint8Array) {
+      bytes = converted;
+    } else if (converted instanceof ArrayBuffer) {
+      bytes = new Uint8Array(converted);
+    } else if (Buffer.isBuffer(converted)) {
+      bytes = new Uint8Array(converted);
+    } else {
+      console.error("Unexpected heic-convert output type:", typeof converted);
+      return null;
+    }
+
+    const nameWithoutExtension = file.name.replace(/\.(heic|heif)$/i, "") || "image";
+
+    return {
+      data: bytes,
+      contentType: "image/jpeg",
+      fileName: `${nameWithoutExtension}.jpg`,
+    };
+  } catch (error) {
+    console.error("HEIC conversion failed; falling back to original upload.", error);
+    return null;
+  }
+}
+
+function isHeicLikeFile(file: File) {
+  if (file.type === "image/heic" || file.type === "image/heif") {
+    return true;
+  }
+
+  const lowerName = file.name.toLowerCase();
+  return lowerName.endsWith(".heic") || lowerName.endsWith(".heif");
+}
+
+function inferUploadContentType(file: File) {
+  if (file.type) {
+    return file.type;
+  }
+
+  const lowerName = file.name.toLowerCase();
+  if (lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg")) {
+    return "image/jpeg";
+  }
+
+  if (lowerName.endsWith(".png")) {
+    return "image/png";
+  }
+
+  if (lowerName.endsWith(".webp")) {
+    return "image/webp";
+  }
+
+  if (lowerName.endsWith(".gif")) {
+    return "image/gif";
+  }
+
+  if (lowerName.endsWith(".bmp")) {
+    return "image/bmp";
+  }
+
+  if (lowerName.endsWith(".tif") || lowerName.endsWith(".tiff")) {
+    return "image/tiff";
+  }
+
+  if (lowerName.endsWith(".heic")) {
+    return "image/heic";
+  }
+
+  if (lowerName.endsWith(".heif")) {
+    return "image/heif";
+  }
+
+  if (lowerName.endsWith(".avif")) {
+    return "image/avif";
+  }
+
+  return "application/octet-stream";
 }
 
 function updateDemoMosque(qrToken: string, payload: UpdateMosquePayload, files: File[]) {
