@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Disclaimer | Namaz Route",
-  description: "Important usage and accuracy disclaimer for Namaz Route.",
+  title: "Disclaimer | MasjidRoute",
+  description: "Important usage and accuracy disclaimer for MasjidRoute.",
 };
 
 export default function DisclaimerPage() {

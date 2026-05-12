@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Contact and Grievance | Namaz Route",
+  title: "Contact and Grievance | MasjidRoute",
   description: "Contact details for support, privacy, and grievance requests.",
 };
 

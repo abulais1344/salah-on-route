@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Terms of Use | Namaz Route",
-  description: "Terms that govern the use of Namaz Route.",
+  title: "Terms of Use | MasjidRoute",
+  description: "Terms that govern the use of MasjidRoute.",
 };
 
 export default function TermsPage() {

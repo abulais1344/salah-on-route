@@ -1,11 +1,16 @@
 import type { MetadataRoute } from "next";
+import { listMosques } from "@/lib/mosques";
+import { ROUTE_SEO_PAGES, buildMasjidSlug, getPopularCitySlugs } from "@/lib/seo";
+import { SITE_URL } from "@/lib/site-meta";
 
-const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://127.0.0.1:3000";
+const baseUrl = SITE_URL;
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
   const staticPages = [
     "/",
+    "/city",
+    "/route",
     "/privacy",
     "/terms",
     "/disclaimer",
@@ -13,7 +18,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/contact",
   ];
 
-  return staticPages.map((path) => ({
+  const mosques = await listMosques();
+  const citySlugs = getPopularCitySlugs(mosques).slice(0, 40);
+  const mosquePages = mosques.slice(0, 400).map((mosque) => `/masjid/${buildMasjidSlug(mosque)}`);
+  const cityPages = citySlugs.map((city) => `/city/${city}`);
+  const routePages = ROUTE_SEO_PAGES.map((route) => `/route/${route.slug}`);
+  const dynamicPages = [...mosquePages, ...cityPages, ...routePages];
+
+  return [...staticPages, ...dynamicPages].map((path) => ({
     url: `${baseUrl}${path}`,
     lastModified: now,
     changeFrequency: path === "/" ? "daily" : "monthly",

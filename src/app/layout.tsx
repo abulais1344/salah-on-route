@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Manrope, Noto_Nastaliq_Urdu, Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import { Analytics } from "@/components/analytics";
+import { SITE_ALT_NAME, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site-meta";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -20,11 +22,10 @@ const notoNastaliqUrdu = Noto_Nastaliq_Urdu({
 
 export const metadata: Metadata = {
   title: {
-    default: "Namaz Route | Nearby Masjid and Namaz Timings",
-    template: "%s | Namaz Route",
+    default: "MasjidRoute - Find Nearby Masjids & Namaz Timings During Travel",
+    template: `%s | ${SITE_NAME}`,
   },
-  description:
-    "Find nearby masjids and jamaat timings in India, including cities like Nanded and Hyderabad. Route-aware namaz planning with live map navigation.",
+  description: SITE_DESCRIPTION,
   keywords: [
     "namaz timings",
     "nearby masjid",
@@ -37,45 +38,62 @@ export const metadata: Metadata = {
     "jummah timings",
     "india masjid finder",
   ],
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://127.0.0.1:3000"),
+  metadataBase: new URL(SITE_URL),
   alternates: {
     canonical: "/",
   },
   icons: {
     icon: [
+      { url: "/favicon-32.png", type: "image/png", sizes: "32x32" },
+      { url: "/favicon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/favicon-512.png", type: "image/png", sizes: "512x512" },
+      { url: "/favicon.ico", type: "image/x-icon", sizes: "any" },
       { url: "/icon.svg", type: "image/svg+xml" },
       { url: "/namaz-route-logo.svg", type: "image/svg+xml" },
     ],
-    shortcut: [{ url: "/favicon.svg", type: "image/svg+xml" }],
-    apple: [{ url: "/apple-icon.svg", type: "image/svg+xml" }],
+    shortcut: [{ url: "/favicon.ico", type: "image/x-icon" }],
+    apple: [
+      { url: "/apple-icon.svg", type: "image/svg+xml" },
+      { url: "/favicon-192.png", type: "image/png", sizes: "192x192" },
+    ],
   },
   openGraph: {
-    title: "Namaz Route | Nearby Masjid and Namaz Timings",
-    description:
-      "Find nearby masjids and jamaat timings in India with route-aware namaz planning.",
+    title: "MasjidRoute - Find Nearby Masjids & Namaz Timings During Travel",
+    description: SITE_DESCRIPTION,
     url: "/",
-    siteName: "Namaz Route",
+    siteName: SITE_NAME,
     locale: "en_IN",
     type: "website",
     images: [
       {
-        url: "/namaz-route-logo.svg",
+        url: "/favicon-512.png",
         width: 512,
         height: 512,
-        alt: "Namaz Route logo",
+        alt: "MasjidRoute social preview",
       },
     ],
   },
   twitter: {
-    card: "summary",
-    title: "Namaz Route | Nearby Masjid and Namaz Timings",
-    description:
-      "Find nearby masjids and jamaat timings in India with route-aware namaz planning.",
-    images: ["/namaz-route-logo.svg"],
+    card: "summary_large_image",
+    title: "MasjidRoute - Nearby Masjids & Namaz Timings During Travel",
+    description: SITE_DESCRIPTION,
+    images: ["/favicon-512.png"],
+  },
+  applicationName: SITE_NAME,
+  other: {
+    "apple-mobile-web-app-title": SITE_NAME,
+    "og:site_name": SITE_NAME,
+    "og:locale": "en_IN",
+    "application-name": SITE_NAME,
+    "site-name": SITE_NAME,
+    "alternate-site-name": SITE_ALT_NAME,
   },
   robots: {
     index: true,
     follow: true,
+  },
+  verification: {
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
   },
 };
 
@@ -90,7 +108,10 @@ export default function RootLayout({
       data-scroll-behavior="smooth"
       className={`${manrope.variable} ${spaceGrotesk.variable} ${notoNastaliqUrdu.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 }
