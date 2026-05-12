@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useMemo, useState, useEffect } from "react";
 
 import { formatAddressForDisplay } from "@/lib/address";
@@ -10,7 +11,9 @@ import {
   getNextJamaat,
   getStatusTone,
 } from "@/lib/jamaat";
+import { trackEvent } from "@/lib/analytics";
 import { getGoogleMapsDirectionsUrl } from "@/lib/maps-links";
+import { buildMasjidSlug } from "@/lib/seo";
 import type { MosqueView } from "@/types/mosque";
 
 interface MosqueCardProps {
@@ -115,15 +118,26 @@ export function MosqueCard({ mosque, onAddTimings, isCreating = false }: MosqueC
           href={directionsUrl}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() => trackEvent("navigate_click", { mosque_name: mosque.name, location: "card" })}
           className="inline-flex min-h-11 items-center rounded-full bg-[linear-gradient(135deg,#4f46e5_0%,#315ae9_42%,#2563eb_100%)] px-5 text-sm font-semibold !text-white visited:!text-white shadow-[0_8px_18px_rgba(30,64,175,0.18)] transition hover:brightness-[0.98]"
         >
           Navigate
         </a>
 
+        <Link
+          href={`/masjid/${buildMasjidSlug(mosque)}`}
+          className="inline-flex min-h-11 items-center rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
+        >
+          Masjid page
+        </Link>
+
         {!mosque.hasJamaatData && onAddTimings ? (
           <button
             type="button"
-            onClick={() => onAddTimings?.(mosque)}
+            onClick={() => {
+              trackEvent("update_timings_click", { mosque_name: mosque.name, location: "card" });
+              onAddTimings?.(mosque);
+            }}
             disabled={isCreating}
             className="inline-flex min-h-11 items-center rounded-full border border-stone-300 px-4 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-70"
           >

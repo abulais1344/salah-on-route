@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
+import { SITE_URL } from "@/lib/site-meta";
 
-const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://127.0.0.1:3000";
+const baseUrl = SITE_URL;
 
 export default function robots(): MetadataRoute.Robots {
   return {

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | Namaz Route",
-  description: "How Namaz Route collects, uses, and protects personal data.",
+  title: "Privacy Policy | MasjidRoute",
+  description: "How MasjidRoute collects, uses, and protects personal data.",
 };
 
 export default function PrivacyPage() {

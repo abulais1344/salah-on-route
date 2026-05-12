@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Community Guidelines | Namaz Route",
+  title: "Community Guidelines | MasjidRoute",
   description: "Content and conduct rules for community submissions.",
 };
 
