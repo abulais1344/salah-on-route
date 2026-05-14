@@ -5,6 +5,8 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 import { formatDisplayTime } from "@/lib/jamaat";
+import { TimetableUpload } from "@/components/timetable-upload";
+import type { ExtractedPrayerTimes } from "@/lib/extract-prayer-times";
 import type { MosqueView, PrayerTimes } from "@/types/mosque";
 
 interface UpdateFormProps {
@@ -72,6 +74,20 @@ export function UpdateForm({ mosque, lastUpdatedDisplay, createFromPlace }: Upda
 
   function updatePrayer(key: keyof PrayerTimes, value: string) {
     setPrayers((current) => ({ ...current, [key]: value }));
+  }
+
+  function applyExtractedTimings(extracted: ExtractedPrayerTimes) {
+    setPrayers((current) => ({
+      fajr: extracted.fajr ?? current.fajr,
+      zuhr: extracted.zuhr ?? current.zuhr,
+      asr: extracted.asr ?? current.asr,
+      maghrib: extracted.maghrib ?? current.maghrib,
+      isha: extracted.isha ?? current.isha,
+    }));
+
+    if (extracted.jumma) {
+      setJuma1(extracted.jumma);
+    }
   }
 
   function addFiles(incomingFiles: File[]) {
@@ -214,6 +230,10 @@ export function UpdateForm({ mosque, lastUpdatedDisplay, createFromPlace }: Upda
       </div>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="md:col-span-2 xl:col-span-4">
+          <TimetableUpload onApply={applyExtractedTimings} />
+        </div>
+
         {Object.entries(prayers).map(([prayer, value]) => (
           <label key={prayer} className="space-y-2 rounded-[22px] bg-stone-50 p-4">
             <span className="text-xs font-semibold uppercase tracking-[0.26em] text-stone-500">
