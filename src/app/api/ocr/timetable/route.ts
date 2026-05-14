@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { createSupabaseServiceClient } from "@/lib/supabase";
+import { createSupabaseServiceClient, getStorageBucket } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -85,16 +85,29 @@ async function uploadTimetableImage(file: File) {
   try {
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-") || "timetable.jpg";
     const filePath = `uploads/${new Date().toISOString().slice(0, 10)}/${randomUUID()}-${safeName}`;
+    const fallbackBucket = getStorageBucket();
+    const targetBuckets =
+      fallbackBucket && fallbackBucket !== TIMETABLE_STORAGE_BUCKET
+        ? [TIMETABLE_STORAGE_BUCKET, fallbackBucket]
+        : [TIMETABLE_STORAGE_BUCKET];
 
-    const upload = await supabase.storage
-      .from(TIMETABLE_STORAGE_BUCKET)
-      .upload(filePath, file, {
+    let uploadedBucket: string | null = null;
+
+    for (const bucket of targetBuckets) {
+      const upload = await supabase.storage.from(bucket).upload(filePath, file, {
         contentType: file.type || "application/octet-stream",
         upsert: false,
       });
 
-    if (upload.error) {
-      console.error("Timetable storage upload failed:", upload.error);
+      if (!upload.error) {
+        uploadedBucket = bucket;
+        break;
+      }
+
+      console.error(`Timetable storage upload failed for bucket ${bucket}:`, upload.error);
+    }
+
+    if (!uploadedBucket) {
       return {
         publicUrl: null,
         warning: "Image OCR succeeded but storage upload failed.",
@@ -102,12 +115,17 @@ async function uploadTimetableImage(file: File) {
     }
 
     const publicUrl = supabase.storage
-      .from(TIMETABLE_STORAGE_BUCKET)
+      .from(uploadedBucket)
       .getPublicUrl(filePath).data.publicUrl;
+
+    const warning =
+      uploadedBucket === TIMETABLE_STORAGE_BUCKET
+        ? null
+        : `Image saved to ${uploadedBucket} bucket because timetables bucket is unavailable.`;
 
     return {
       publicUrl,
-      warning: null,
+      warning,
     };
   } catch (error) {
     console.error("Unexpected timetable upload error:", error);

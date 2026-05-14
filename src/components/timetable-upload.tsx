@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { recognize } from "tesseract.js";
+import { PSM, createWorker } from "tesseract.js";
 
 import { extractPrayerTimes } from "@/lib/extract-prayer-times";
 import type { ExtractedPrayerTimes } from "@/lib/extract-prayer-times";
@@ -45,6 +45,7 @@ const EMPTY_EXTRACTED: ExtractedPrayerTimes = {
 export function TimetableUpload({ onApply }: TimetableUploadProps) {
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const captureInputRef = useRef<HTMLInputElement | null>(null);
+  const workerRef = useRef<Promise<Awaited<ReturnType<typeof createWorker>>> | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [storedPreviewDataUrl, setStoredPreviewDataUrl] = useState<string | null>(
     () => readStoredOcrDraft()?.imagePreviewDataUrl || null,
@@ -83,6 +84,12 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
     return () => {
       if (selectedFile && previewUrl) {
         URL.revokeObjectURL(previewUrl);
+      }
+
+      const workerPromise = workerRef.current;
+      if (workerPromise) {
+        void workerPromise.then((worker) => worker.terminate()).catch(() => undefined);
+        workerRef.current = null;
       }
     };
   }, [previewUrl, selectedFile]);
@@ -164,8 +171,10 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
     setOcrStep("preparing");
 
     try {
-      const optimizedImage = await compressImageForUpload(selectedFile);
-      setOcrStep("reading");
+      const [ocrImage, optimizedImage] = await Promise.all([
+        prepareImageForOcr(selectedFile),
+        compressImageForUpload(selectedFile),
+      ]);
 
       if (optimizedImage !== selectedFile) {
         const beforeKb = Math.round(selectedFile.size / 1024);
@@ -173,9 +182,11 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
         setOptimizationInfo(`Image optimized for faster upload (${beforeKb} KB -> ${afterKb} KB).`);
       }
 
-      setOcrStep("matching");
+      setOcrStep("reading");
+      const worker = await getOcrWorker(workerRef);
+      const ocrResult = await worker.recognize(ocrImage);
 
-      const ocrResult = await recognize(optimizedImage, "eng");
+      setOcrStep("matching");
       const rawText = ocrResult.data?.text?.trim() || "";
       const extracted = extractPrayerTimes(rawText);
       setEditableTimes(extracted);
@@ -620,6 +631,90 @@ async function compressImageForUpload(file: File) {
   } catch {
     return file;
   }
+}
+
+async function prepareImageForOcr(file: File) {
+  if (!file.type.startsWith("image/") || file.type === "image/gif") {
+    return file;
+  }
+
+  try {
+    const imageDataUrl = await fileToDataUrl(file);
+    const image = await loadImage(imageDataUrl);
+    const largestSide = Math.max(image.width, image.height);
+
+    let scale = 1;
+    if (largestSide < 1400) {
+      scale = 1400 / largestSide;
+    } else if (largestSide > 2200) {
+      scale = 2200 / largestSide;
+    }
+
+    const width = Math.max(1, Math.round(image.width * scale));
+    const height = Math.max(1, Math.round(image.height * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) {
+      return file;
+    }
+
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, width, height);
+    context.drawImage(image, 0, 0, width, height);
+
+    const imageData = context.getImageData(0, 0, width, height);
+    const pixels = imageData.data;
+    for (let index = 0; index < pixels.length; index += 4) {
+      const red = pixels[index];
+      const green = pixels[index + 1];
+      const blue = pixels[index + 2];
+      const luminance = red * 0.299 + green * 0.587 + blue * 0.114;
+      const contrasted = clampColor((luminance - 128) * 1.55 + 136);
+      const cleaned = contrasted > 244 ? 255 : contrasted < 18 ? 0 : contrasted;
+
+      pixels[index] = cleaned;
+      pixels[index + 1] = cleaned;
+      pixels[index + 2] = cleaned;
+      pixels[index + 3] = 255;
+    }
+
+    context.putImageData(imageData, 0, 0);
+    return canvas;
+  } catch {
+    return file;
+  }
+}
+
+function clampColor(value: number) {
+  return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+async function getOcrWorker(
+  workerRef: React.MutableRefObject<Promise<Awaited<ReturnType<typeof createWorker>>> | null>,
+) {
+  if (!workerRef.current) {
+    workerRef.current = (async () => {
+      const worker = await createWorker("eng", 1, {
+        errorHandler: () => undefined,
+      });
+
+      await worker.setParameters({
+        tessedit_pageseg_mode: PSM.SPARSE_TEXT,
+        tessedit_char_whitelist:
+          "0123456789:.-/()[]ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ",
+        preserve_interword_spaces: "1",
+        user_defined_dpi: "220",
+      });
+
+      return worker;
+    })();
+  }
+
+  return workerRef.current;
 }
 
 function fileToDataUrl(file: File) {
