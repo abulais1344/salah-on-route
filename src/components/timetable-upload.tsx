@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { recognize } from "tesseract.js";
 
 import type { ExtractedPrayerTimes } from "@/lib/extract-prayer-times";
 
@@ -171,36 +172,27 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
         setOptimizationInfo(`Image optimized for faster upload (${beforeKb} KB -> ${afterKb} KB).`);
       }
 
-      const formData = new FormData();
-      formData.set("image", optimizedImage);
-
-      const response = await fetchWithTimeout("/api/ocr/timetable", {
-        method: "POST",
-        body: formData,
-      }, 35000);
-
       setOcrStep("matching");
 
-      const payload = (await safeParseOcrResponse(response)) as OcrResponse;
-      if (!response.ok) {
-        throw new Error(resolveOcrError(payload, response.status));
-      }
-
-      const extracted = payload.extracted || EMPTY_EXTRACTED;
+      const ocrResult = await recognize(optimizedImage, "eng");
+      const rawText = ocrResult.data?.text?.trim() || "";
+      const extracted = extractPrayerTimes(rawText);
       setEditableTimes(extracted);
       setDetectedTimes(extracted);
-      setRawText(payload.rawText || "");
+      setRawText(rawText);
       setOcrStep("done");
       setHasVerifiedDetectedData(false);
 
-      if (payload.hasAnyExtractedValue) {
+      const hasAnyExtractedValue = Object.values(extracted).some(Boolean);
+      if (hasAnyExtractedValue) {
         setMessage("Done. Review each detected timing, correct anything needed, then verify before applying.");
       } else {
         setMessage("OCR could not detect all timings. You can continue in manual mode.");
       }
 
-      if (payload.warning) {
-        setError(payload.warning);
+      const uploadWarning = await uploadOptimizedImage(optimizedImage);
+      if (uploadWarning) {
+        setError(uploadWarning);
       }
     } catch (ocrError) {
       setOcrStep("idle");
@@ -239,7 +231,7 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
   }
 
   return (
-    <section className="rounded-[22px] border border-stone-200 bg-stone-50 p-4 sm:p-5">
+    <section className="rounded-[22px] border border-stone-200 bg-stone-50 p-3.5 sm:p-5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-700">
@@ -270,20 +262,20 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
         ))}
       </div>
 
-      <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1.4fr]">
+      <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1.4fr] sm:mt-4">
         <div className="space-y-3">
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
             <button
               type="button"
               onClick={() => uploadInputRef.current?.click()}
-              className="min-h-11 rounded-full border border-stone-300 bg-white px-4 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
+              className="min-h-11 rounded-full border border-stone-300 bg-white px-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 sm:px-4"
             >
               Upload image
             </button>
             <button
               type="button"
               onClick={() => captureInputRef.current?.click()}
-              className="min-h-11 rounded-full border border-stone-300 bg-white px-4 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
+              className="min-h-11 rounded-full border border-stone-300 bg-white px-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 sm:px-4"
             >
               Capture image
             </button>
@@ -312,7 +304,7 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
             }}
           />
 
-          <div className="rounded-[14px] border border-stone-200 bg-white px-3 py-2 text-xs text-stone-600">
+          <div className="rounded-[14px] border border-stone-200 bg-white px-3 py-2 text-xs text-stone-600 shadow-[0_8px_24px_rgba(41,37,36,0.03)]">
             {selectedFile ? (
               <p className="font-semibold text-stone-800">
                 Selected: {selectedFile.name} ({Math.round(selectedFile.size / 1024)} KB)
@@ -347,19 +339,19 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
               : "Read timetable"}
           </button>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
             <button
               type="button"
               onClick={() => void runOcr()}
               disabled={!selectedFile || isProcessing}
-              className="min-h-10 rounded-full border border-stone-300 bg-white px-4 text-xs font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-70"
+              className="min-h-10 rounded-full border border-stone-300 bg-white px-3 text-xs font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-70 sm:px-4"
             >
               Retry OCR
             </button>
             <button
               type="button"
               onClick={clearDetectedValues}
-              className="min-h-10 rounded-full border border-stone-300 bg-white px-4 text-xs font-semibold text-stone-700 transition hover:bg-stone-100"
+              className="min-h-10 rounded-full border border-stone-300 bg-white px-3 text-xs font-semibold text-stone-700 transition hover:bg-stone-100 sm:px-4"
             >
               Clear detected values
             </button>
@@ -501,20 +493,6 @@ function getFieldStatusStyle(
   return "bg-stone-100 text-stone-600";
 }
 
-async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number) {
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    return await fetch(url, {
-      ...init,
-      signal: controller.signal,
-    });
-  } finally {
-    window.clearTimeout(timeoutId);
-  }
-}
-
 async function safeParseOcrResponse(response: Response) {
   const contentType = response.headers.get("content-type") || "";
   if (contentType.includes("application/json")) {
@@ -525,26 +503,6 @@ async function safeParseOcrResponse(response: Response) {
   return {
     error: rawText || "Unexpected OCR response from server.",
   };
-}
-
-function resolveOcrError(payload: OcrResponse, status: number) {
-  if (payload.error) {
-    return payload.error;
-  }
-
-  if (status === 413) {
-    return "Image is too large. Use a smaller photo and try again.";
-  }
-
-  if (status === 429) {
-    return "Server is busy right now. Please try again in a moment.";
-  }
-
-  if (status >= 500) {
-    return "OCR service is unavailable right now. Please retry or continue manually.";
-  }
-
-  return "Could not process this image. Choose another photo or continue manually.";
 }
 
 async function buildStoredPreviewDataUrl(file: File) {
@@ -591,6 +549,27 @@ function readStoredOcrDraft() {
   } catch {
     window.sessionStorage.removeItem(getOcrDraftStorageKey());
     return null;
+  }
+}
+
+async function uploadOptimizedImage(file: File) {
+  try {
+    const formData = new FormData();
+    formData.set("image", file);
+
+    const response = await fetch("/api/ocr/timetable", {
+      method: "POST",
+      body: formData,
+    });
+
+    const payload = (await safeParseOcrResponse(response)) as OcrResponse;
+    if (!response.ok) {
+      return payload.error || "Unable to upload timetable image right now. You can still continue manually.";
+    }
+
+    return payload.warning || null;
+  } catch {
+    return "Unable to upload timetable image right now. You can still continue manually.";
   }
 }
 
