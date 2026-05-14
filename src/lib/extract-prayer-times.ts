@@ -22,7 +22,22 @@ const PRAYER_ALIASES: Record<keyof ExtractedPrayerTimes, string[]> = {
   asr: ["asr", "asar"],
   maghrib: ["maghrib", "magrib", "magribh"],
   isha: ["isha", "esha"],
-  jumma: ["jumma", "juma", "jummah", "jumuah", "jumua", "khutbah"],
+  jumma: [
+    "jumma",
+    "juma",
+    "jummah",
+    "jumuah",
+    "jumua",
+    "jum ah",
+    "jum ahh",
+    "juma1",
+    "juma 1",
+    "jamat",
+    "jamaat",
+    "khutbah",
+    "khutba",
+    "friday",
+  ],
 };
 
 const OCR_TIME_PATTERN = /\b([01]?\d|2[0-3])[:.\-\s]([0-5]\d)\s*([ap]m)?\b/gi;
@@ -63,7 +78,43 @@ export function extractPrayerTimes(rawText: string): ExtractedPrayerTimes {
     mergeSequentialFallback(extracted, normalizedText);
   }
 
+  if (!extracted.jumma) {
+    extracted.jumma = findJummaFallback(lines);
+  }
+
   return extracted;
+}
+
+function findJummaFallback(lines: string[]) {
+  const jummaContextPattern =
+    /(jum|juma|jumma|jummah|jumuah|friday|khutba|khutbah|jamat|jamaat)/i;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!jummaContextPattern.test(lines[index])) {
+      continue;
+    }
+
+    const windowLines = [
+      lines[index - 2],
+      lines[index - 1],
+      lines[index],
+      lines[index + 1],
+      lines[index + 2],
+    ].filter((value): value is string => Boolean(value));
+
+    const candidates = extractAllTimes(windowLines.join(" "), "jumma").filter((time) =>
+      isLikelyJummaTime(time),
+    );
+
+    if (candidates.length === 0) {
+      continue;
+    }
+
+    // Prefer the latest valid noon slot when multiple values are present (often khutbah + jamaat).
+    return candidates.sort((left, right) => toMinutes(right) - toMinutes(left))[0];
+  }
+
+  return null;
 }
 
 function findTimeFromPrayerLines(lines: string[], aliases: string[], prayer: PrayerField) {
@@ -107,31 +158,50 @@ function findTimeNearAlias(text: string, aliases: string[], prayer: PrayerField)
 }
 
 function extractFirstTime(text: string, prayer?: PrayerField) {
-  OCR_TIME_PATTERN.lastIndex = 0;
-  OCR_TIME_WITHOUT_MINUTES_PATTERN.lastIndex = 0;
+  const candidates = extractAllTimes(text, prayer);
+  return candidates[0] || null;
+}
 
-  const first = OCR_TIME_PATTERN.exec(text);
-  if (first) {
+function extractAllTimes(text: string, prayer?: PrayerField) {
+  const normalized: string[] = [];
+  const seen = new Set<string>();
+
+  OCR_TIME_PATTERN.lastIndex = 0;
+  let first = OCR_TIME_PATTERN.exec(text);
+  while (first) {
     const hours = Number(first[1]);
     const minutes = Number(first[2]);
     const period = first[3]?.toLowerCase();
 
     if (Number.isFinite(hours) && Number.isFinite(minutes)) {
-      return normalizeTime(hours, minutes, period, prayer);
+      const value = normalizeTime(hours, minutes, period, prayer);
+      if (value && !seen.has(value)) {
+        seen.add(value);
+        normalized.push(value);
+      }
     }
+
+    first = OCR_TIME_PATTERN.exec(text);
   }
 
-  const fallback = OCR_TIME_WITHOUT_MINUTES_PATTERN.exec(text);
-  if (fallback) {
+  OCR_TIME_WITHOUT_MINUTES_PATTERN.lastIndex = 0;
+  let fallback = OCR_TIME_WITHOUT_MINUTES_PATTERN.exec(text);
+  while (fallback) {
     const hours = Number(fallback[1]);
     const period = fallback[2]?.toLowerCase();
 
     if (Number.isFinite(hours)) {
-      return normalizeTime(hours, 0, period, prayer);
+      const value = normalizeTime(hours, 0, period, prayer);
+      if (value && !seen.has(value)) {
+        seen.add(value);
+        normalized.push(value);
+      }
     }
+
+    fallback = OCR_TIME_WITHOUT_MINUTES_PATTERN.exec(text);
   }
 
-  return null;
+  return normalized;
 }
 
 function normalizeTime(hours: number, minutes: number, period?: string, prayer?: PrayerField) {
@@ -261,6 +331,11 @@ function matchesPrayerRanges(values: string[]) {
     maghrib >= 960 && maghrib <= 1320 &&
     isha >= 1020 && isha <= 1439
   );
+}
+
+function isLikelyJummaTime(value: string) {
+  const minutes = toMinutes(value);
+  return minutes >= 660 && minutes <= 930;
 }
 
 function toMinutes(value: string) {
