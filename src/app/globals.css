@@ -55,3 +55,20 @@ img {
   display: block;
   max-width: 100%;
 }
+
+@keyframes ocr-detected-pop {
+  0% {
+    transform: translateY(3px);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+
+  55% {
+    transform: translateY(0);
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.08);
+  }
+
+  100% {
+    transform: translateY(0);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
