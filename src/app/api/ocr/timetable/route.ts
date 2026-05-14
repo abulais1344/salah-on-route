@@ -1,8 +1,4 @@
 import { randomUUID } from "crypto";
-
-import { recognize } from "tesseract.js";
-
-import { extractPrayerTimes } from "@/lib/extract-prayer-times";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -10,7 +6,6 @@ export const dynamic = "force-dynamic";
 
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
 const TIMETABLE_STORAGE_BUCKET = "timetables";
-const OCR_TIMEOUT_MS = 30000;
 
 export async function POST(request: Request) {
   try {
@@ -27,36 +22,18 @@ export async function POST(request: Request) {
     }
 
     const uploadResult = await uploadTimetableImage(image);
-    const imageBuffer = Buffer.from(await image.arrayBuffer());
-    const ocrResult = await withTimeout(recognize(imageBuffer, "eng"), OCR_TIMEOUT_MS);
-    const rawText = ocrResult.data?.text?.trim() || "";
-    const extracted = extractPrayerTimes(rawText);
-    const hasAnyExtractedValue = Object.values(extracted).some(Boolean);
 
     return Response.json({
-      rawText,
-      extracted,
-      hasAnyExtractedValue,
       timetableImageUrl: uploadResult.publicUrl,
       warning: uploadResult.warning,
     });
   } catch (error) {
     console.error("Timetable OCR failed:", error);
 
-    if (isAbortError(error)) {
-      return Response.json(
-        {
-          error: "OCR timed out. Please retry with a clearer image or fill timings manually.",
-          errorCode: "OCR_TIMEOUT",
-        },
-        { status: 504 },
-      );
-    }
-
     return Response.json(
       {
-        error: "Unable to process timetable image right now. You can retry or continue manually.",
-        errorCode: "OCR_FAILED",
+        error: "Unable to upload timetable image right now. You can retry or continue manually.",
+        errorCode: "UPLOAD_FAILED",
       },
       { status: 500 },
     );
@@ -139,30 +116,4 @@ async function uploadTimetableImage(file: File) {
       warning: "Image OCR succeeded but storage upload failed.",
     };
   }
-}
-
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number) {
-  return new Promise<T>((resolve, reject) => {
-    const timeoutId = setTimeout(() => {
-      reject(new Error("OCR_TIMEOUT"));
-    }, timeoutMs);
-
-    promise
-      .then((value) => {
-        clearTimeout(timeoutId);
-        resolve(value);
-      })
-      .catch((error) => {
-        clearTimeout(timeoutId);
-        reject(error);
-      });
-  });
-}
-
-function isAbortError(error: unknown) {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-
-  return error.name === "AbortError" || error.message === "OCR_TIMEOUT";
 }
