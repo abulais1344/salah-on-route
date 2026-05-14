@@ -22,19 +22,34 @@ interface UpdateFormProps {
   };
 }
 
+type FormStep = 1 | 2 | 3;
+
+interface UpdateDraft {
+  activeStep: FormStep;
+  prayers: PrayerTimes;
+  juma1: string;
+  juma2: string;
+  remarks: string;
+}
+
 export function UpdateForm({ mosque, lastUpdatedDisplay, createFromPlace }: UpdateFormProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [prayers, setPrayers] = useState<PrayerTimes>({
-    fajr: normalizeTimeForInput(mosque.prayers.fajr),
-    zuhr: normalizeTimeForInput(mosque.prayers.zuhr),
-    asr: normalizeTimeForInput(mosque.prayers.asr),
-    maghrib: normalizeTimeForInput(mosque.prayers.maghrib),
-    isha: normalizeTimeForInput(mosque.prayers.isha),
-  });
-  const [juma1, setJuma1] = useState(normalizeTimeForInput(mosque.juma1));
-  const [juma2, setJuma2] = useState(normalizeTimeForInput(mosque.juma2));
-  const [remarks, setRemarks] = useState(mosque.remarks ?? "");
+  const draftKey = getUpdateDraftStorageKey(mosque.qrToken, createFromPlace?.placeId);
+  const initialDraft = readUpdateDraft(draftKey);
+  const [prayers, setPrayers] = useState<PrayerTimes>(
+    () =>
+      initialDraft?.prayers || {
+        fajr: normalizeTimeForInput(mosque.prayers.fajr),
+        zuhr: normalizeTimeForInput(mosque.prayers.zuhr),
+        asr: normalizeTimeForInput(mosque.prayers.asr),
+        maghrib: normalizeTimeForInput(mosque.prayers.maghrib),
+        isha: normalizeTimeForInput(mosque.prayers.isha),
+      },
+  );
+  const [juma1, setJuma1] = useState(() => initialDraft?.juma1 ?? normalizeTimeForInput(mosque.juma1));
+  const [juma2, setJuma2] = useState(() => initialDraft?.juma2 ?? normalizeTimeForInput(mosque.juma2));
+  const [remarks, setRemarks] = useState(() => initialDraft?.remarks ?? mosque.remarks ?? "");
   const [files, setFiles] = useState<File[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -42,6 +57,7 @@ export function UpdateForm({ mosque, lastUpdatedDisplay, createFromPlace }: Upda
   const [isSaving, setIsSaving] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [postSuccessRedirect, setPostSuccessRedirect] = useState<string | null>(null);
+  const [activeStep, setActiveStep] = useState<FormStep>(() => initialDraft?.activeStep ?? 1);
   const totalUploadSize = files.reduce((sum, file) => sum + file.size, 0);
   const filePreviews = useMemo(
     () => files.map((file) => URL.createObjectURL(file)),
@@ -88,7 +104,64 @@ export function UpdateForm({ mosque, lastUpdatedDisplay, createFromPlace }: Upda
     if (extracted.jumma) {
       setJuma1(extracted.jumma);
     }
+
+    setActiveStep(2);
   }
+
+  const hasAnyPrayerValue =
+    Object.values(prayers).some((value) => Boolean(value)) || Boolean(juma1) || Boolean(juma2);
+  const baselinePrayers: PrayerTimes = {
+    fajr: normalizeTimeForInput(mosque.prayers.fajr),
+    zuhr: normalizeTimeForInput(mosque.prayers.zuhr),
+    asr: normalizeTimeForInput(mosque.prayers.asr),
+    maghrib: normalizeTimeForInput(mosque.prayers.maghrib),
+    isha: normalizeTimeForInput(mosque.prayers.isha),
+  };
+  const baselineJuma1 = normalizeTimeForInput(mosque.juma1);
+  const baselineJuma2 = normalizeTimeForInput(mosque.juma2);
+  const baselineRemarks = mosque.remarks ?? "";
+  const reviewItems = buildReviewItems({
+    prayers,
+    baselinePrayers,
+    juma1,
+    baselineJuma1,
+    juma2,
+    baselineJuma2,
+    remarks,
+    baselineRemarks,
+    newImagesCount: files.length,
+  });
+
+  function moveToStep(step: FormStep) {
+    setActiveStep(step);
+    setError(null);
+  }
+
+  function goToNextStep() {
+    setActiveStep((current) => (current === 3 ? 3 : ((current + 1) as FormStep)));
+    setError(null);
+  }
+
+  function goToPreviousStep() {
+    setActiveStep((current) => (current === 1 ? 1 : ((current - 1) as FormStep)));
+    setError(null);
+  }
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const draft: UpdateDraft = {
+      activeStep,
+      prayers,
+      juma1,
+      juma2,
+      remarks,
+    };
+
+    window.sessionStorage.setItem(draftKey, JSON.stringify(draft));
+  }, [activeStep, draftKey, juma1, juma2, prayers, remarks]);
 
   function addFiles(incomingFiles: File[]) {
     if (incomingFiles.length === 0) {
@@ -215,103 +288,191 @@ export function UpdateForm({ mosque, lastUpdatedDisplay, createFromPlace }: Upda
   return (
     <form
       onSubmit={handleSubmit}
-      className="overflow-hidden rounded-[36px] border border-white/70 bg-white/85 p-3.5 shadow-[0_22px_90px_rgba(41,37,36,0.12)] backdrop-blur-sm sm:p-7"
+      className="overflow-hidden rounded-2xl border border-stone-200 bg-white p-4 pb-20 shadow-sm sm:p-7"
     >
-      <div className="-mx-3.5 -mt-3.5 mb-4 h-1.5 bg-[linear-gradient(90deg,#f97316_0%,#fb923c_46%,#fef3c7_100%)] sm:-mx-7 sm:-mt-7 sm:mb-5" />
+      <div className="-mx-4 -mt-4 mb-5 h-1 bg-blue-600 sm:-mx-7 sm:-mt-7 sm:mb-6" />
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-orange-700">Step 2 of 2</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Guided update flow</p>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
-            Update all timings
+            Update mosque timings
           </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600 sm:text-base">
-            Step 2 of 2. Pre-filled values, one tap submit, no login required.
+          <p className="mt-2 max-w-2xl text-sm leading-5 text-stone-600 sm:text-base">
+            Import, verify, and publish in three steps.
           </p>
         </div>
 
-        <div className="rounded-[24px] border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-600 shadow-[0_10px_30px_rgba(41,37,36,0.05)]">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500">Last updated</p>
+        <div className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-600">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Last updated</p>
           <p className="mt-1 font-semibold text-stone-900">{lastUpdatedDisplay}</p>
         </div>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:mt-6 sm:gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="md:col-span-2 xl:col-span-4">
-          <TimetableUpload onApply={applyExtractedTimings} />
-        </div>
+      <div className="mt-4 grid grid-cols-3 gap-1.5 sm:mt-5 sm:gap-2">
+        {[
+          { id: 1 as FormStep, title: "1", label: "Photo" },
+          { id: 2 as FormStep, title: "2", label: "Verify" },
+          { id: 3 as FormStep, title: "3", label: "Publish" },
+        ].map((step) => {
+          const isActive = activeStep === step.id;
+          const isCompleted = activeStep > step.id;
 
+          return (
+            <button
+              key={step.id}
+              type="button"
+              onClick={() => moveToStep(step.id)}
+              className={`rounded-lg border px-3 py-2 text-left transition ${
+                isActive
+                  ? "border-blue-300 bg-blue-50"
+                  : isCompleted
+                    ? "border-emerald-200 bg-emerald-50"
+                    : "border-stone-200 bg-white"
+              }`}
+            >
+              <p
+                className={`text-[10px] font-semibold uppercase tracking-[0.1em] ${
+                  isActive ? "text-blue-700" : isCompleted ? "text-emerald-700" : "text-stone-500"
+                }`}
+              >
+                {step.title}
+              </p>
+              <p className="text-sm font-semibold text-stone-900">{step.label}</p>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-2 flex items-center justify-between px-1 text-[11px] text-stone-500">
+        <span>Draft auto-save enabled</span>
+        <span className="font-semibold text-stone-600">Auto-saved</span>
+      </div>
+
+      {activeStep === 1 ? (
+        <section className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-3 sm:mt-5 sm:p-4">
+          <TimetableUpload onApply={applyExtractedTimings} />
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={goToNextStep}
+              className="hidden min-h-11 rounded-full bg-[linear-gradient(135deg,#4f46e5_0%,#315ae9_42%,#2563eb_100%)] px-5 text-sm font-semibold text-white transition hover:brightness-[0.98] sm:inline-flex"
+            >
+              Continue to timings
+            </button>
+            <button
+              type="button"
+              onClick={() => moveToStep(2)}
+              className="hidden min-h-11 rounded-full border border-stone-300 bg-white px-5 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 sm:inline-flex"
+            >
+              Skip photo scan and enter manually
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {activeStep === 2 ? (
+        <div className="mt-5 grid gap-3 sm:mt-6 sm:gap-4 md:grid-cols-2 xl:grid-cols-4">
         {Object.entries(prayers).map(([prayer, value]) => (
           <label
             key={prayer}
-            className="space-y-2 rounded-[24px] border border-stone-200 bg-stone-50/90 p-3 shadow-[0_8px_24px_rgba(41,37,36,0.03)] sm:p-4"
+            className="space-y-2 rounded-xl border border-stone-200 bg-stone-50 p-3 sm:p-4"
           >
-            <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-stone-500">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
               {prayer}
             </span>
             <input
               type="time"
               value={value ?? ""}
               onChange={(event) => updatePrayer(prayer as keyof PrayerTimes, event.target.value)}
-              className="min-h-12 w-full rounded-[16px] border border-stone-200 bg-white px-3 text-stone-900 shadow-[0_1px_0_rgba(255,255,255,0.8)] focus:border-orange-400 focus:outline-none"
+              className="min-h-11 w-full rounded-lg border border-stone-300 bg-white px-3 text-stone-900 focus:border-blue-300 focus:outline-none"
             />
           </label>
         ))}
-      </div>
+        </div>
+      ) : null}
 
-      <div className="mt-3 grid gap-3 sm:mt-4 sm:gap-4 md:grid-cols-2">
-        <label className="space-y-2 rounded-[24px] border border-amber-200 bg-amber-50/90 p-3 shadow-[0_8px_24px_rgba(41,37,36,0.03)] sm:p-4">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-700">جمعہ | Juma 1</span>
+      {activeStep === 2 ? (
+        <>
+          <div className="mt-3 grid gap-3 sm:mt-4 sm:gap-4 md:grid-cols-2">
+        <label className="space-y-2 rounded-xl border border-blue-200 bg-blue-50 p-3 sm:p-4">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">جمعہ | Juma 1</span>
           <input
             type="time"
             value={juma1}
             onChange={(event) => setJuma1(event.target.value)}
-            className="min-h-12 w-full rounded-[16px] border border-amber-200 bg-white px-3 text-stone-900 shadow-[0_1px_0_rgba(255,255,255,0.8)] focus:border-orange-400 focus:outline-none"
+            className="min-h-11 w-full rounded-lg border border-blue-200 bg-white px-3 text-stone-900 focus:border-blue-300 focus:outline-none"
           />
           {juma1 ? (
             <button
               type="button"
               onClick={() => setJuma1("")}
-              className="text-left text-xs font-semibold text-amber-700 hover:text-amber-800"
+              className="text-left text-xs font-semibold text-blue-700 hover:text-blue-800"
             >
               Clear Juma 1
             </button>
           ) : null}
         </label>
-        <label className="space-y-2 rounded-[24px] border border-amber-200 bg-amber-50/90 p-3 shadow-[0_8px_24px_rgba(41,37,36,0.03)] sm:p-4">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-700">Juma 2</span>
+        <label className="space-y-2 rounded-xl border border-blue-200 bg-blue-50 p-3 sm:p-4">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">Juma 2</span>
           <input
             type="time"
             value={juma2}
             onChange={(event) => setJuma2(event.target.value)}
-            className="min-h-12 w-full rounded-[16px] border border-amber-200 bg-white px-3 text-stone-900 shadow-[0_1px_0_rgba(255,255,255,0.8)] focus:border-orange-400 focus:outline-none"
+            className="min-h-11 w-full rounded-lg border border-blue-200 bg-white px-3 text-stone-900 focus:border-blue-300 focus:outline-none"
           />
           {juma2 ? (
             <button
               type="button"
               onClick={() => setJuma2("")}
-              className="text-left text-xs font-semibold text-amber-700 hover:text-amber-800"
+              className="text-left text-xs font-semibold text-blue-700 hover:text-blue-800"
             >
               Clear Juma 2
             </button>
           ) : null}
         </label>
-      </div>
+          </div>
 
-      <div className="mt-3 grid gap-3 sm:mt-4 sm:gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <label className="space-y-2 rounded-[24px] border border-stone-200 bg-stone-50/90 p-3 shadow-[0_8px_24px_rgba(41,37,36,0.03)] sm:p-4">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-stone-500">Remarks</span>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={goToPreviousStep}
+              className="hidden min-h-11 rounded-full border border-stone-300 bg-white px-5 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 sm:inline-flex"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!hasAnyPrayerValue) {
+                  setError("Add at least one prayer or Juma timing before continuing.");
+                  return;
+                }
+                goToNextStep();
+              }}
+              className="hidden min-h-11 rounded-full bg-[linear-gradient(135deg,#4f46e5_0%,#315ae9_42%,#2563eb_100%)] px-5 text-sm font-semibold text-white transition hover:brightness-[0.98] sm:inline-flex"
+            >
+              Continue to details
+            </button>
+          </div>
+        </>
+      ) : null}
+
+      {activeStep === 3 ? (
+        <div className="mt-3 grid gap-3 sm:mt-4 sm:gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <label className="space-y-2 rounded-xl border border-stone-200 bg-stone-50 p-3 sm:p-4">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Remarks</span>
           <textarea
             value={remarks}
             onChange={(event) => setRemarks(event.target.value)}
             placeholder="Second jamaat available, women section available, limited parking..."
             rows={5}
-            className="w-full rounded-[16px] border border-stone-200 bg-white px-3 py-3 text-stone-900 shadow-[0_1px_0_rgba(255,255,255,0.8)] focus:border-orange-400 focus:outline-none"
+            className="w-full rounded-lg border border-stone-300 bg-white px-3 py-3 text-stone-900 focus:border-blue-300 focus:outline-none"
           />
         </label>
 
-        <div className="space-y-2 rounded-[24px] border border-stone-200 bg-stone-50/90 p-3 shadow-[0_8px_24px_rgba(41,37,36,0.03)] sm:p-4">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-stone-500">Images</span>
+        <div className="space-y-2 rounded-xl border border-stone-200 bg-stone-50 p-3 sm:p-4">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Images</span>
           <div
             onDragOver={(event) => {
               event.preventDefault();
@@ -327,7 +488,7 @@ export function UpdateForm({ mosque, lastUpdatedDisplay, createFromPlace }: Upda
               addFiles(Array.from(event.dataTransfer.files ?? []));
             }}
             className={`rounded-[18px] border border-dashed px-4 py-4 transition ${
-              dragActive ? "border-orange-400 bg-orange-50" : "border-stone-300 bg-white"
+              dragActive ? "border-blue-300 bg-blue-50" : "border-stone-300 bg-white"
             }`}
           >
             <input
@@ -339,14 +500,14 @@ export function UpdateForm({ mosque, lastUpdatedDisplay, createFromPlace }: Upda
                 addFiles(Array.from(event.target.files ?? []));
                 event.target.value = "";
               }}
-              className="block min-h-12 w-full rounded-[16px] border border-stone-200 bg-white px-3 py-3 text-sm text-stone-700 shadow-[0_1px_0_rgba(255,255,255,0.8)] focus:border-orange-400 focus:outline-none"
+              className="block min-h-11 w-full rounded-lg border border-stone-300 bg-white px-3 py-3 text-sm text-stone-700 focus:border-blue-300 focus:outline-none"
             />
             <p className="mt-2 text-xs leading-5 text-stone-500">
               Drag and drop or choose files. Up to 5 images, 5 MB each, 20 MB total.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-[16px] bg-white px-3 py-2 text-xs text-stone-600">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 text-xs text-stone-600">
             <p>
               Selected: <span className="font-semibold text-stone-800">{files.length}/5</span> (
               {formatFileSize(totalUploadSize)})
@@ -409,12 +570,12 @@ export function UpdateForm({ mosque, lastUpdatedDisplay, createFromPlace }: Upda
           ) : null}
 
           {mosque.images.length > 0 ? (
-            <div className="space-y-2 rounded-[16px] border border-stone-200 bg-white p-3">
+                <div className="space-y-2 rounded-lg border border-stone-200 bg-white p-3">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-stone-500">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
                   Existing images ({mosque.images.length})
                 </p>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-stone-500">
                   Tap image to preview
                 </p>
               </div>
@@ -450,18 +611,43 @@ export function UpdateForm({ mosque, lastUpdatedDisplay, createFromPlace }: Upda
             converted to JPEG automatically.
           </p>
         </div>
-      </div>
+        </div>
+      ) : null}
 
-      <div className="mt-6 rounded-[24px] bg-stone-950 p-5 text-stone-50">
-        <p className="text-xs uppercase tracking-[0.28em] text-stone-400">Preview</p>
+      {activeStep === 3 ? (
+        <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">Review before publish</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {reviewItems.length > 0 ? (
+              reviewItems.map((item) => (
+                <span
+                  key={item}
+                  className="rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-semibold text-blue-800"
+                >
+                  {item}
+                </span>
+              ))
+            ) : (
+              <span className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs font-semibold text-stone-700">
+                No field changes detected
+              </span>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {activeStep === 3 ? (
+        <div className="mt-6 rounded-xl border border-stone-200 bg-stone-900 p-5 text-stone-50">
+        <p className="text-xs uppercase tracking-[0.14em] text-stone-300">Preview</p>
         <p className="mt-2 text-lg font-semibold">
           Next displayed Jummah: {juma1 ? formatDisplayTime(juma1) : "--"}
           {juma2 ? ` and ${formatDisplayTime(juma2)}` : ""}
         </p>
-      </div>
+        </div>
+      ) : null}
 
       {message ? (
-        <div className="mt-4 rounded-[20px] bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <div className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           <p>{message}</p>
           <p className="mt-1 text-xs text-emerald-700">
             Success. This tab will close automatically in a few seconds.
@@ -469,23 +655,157 @@ export function UpdateForm({ mosque, lastUpdatedDisplay, createFromPlace }: Upda
         </div>
       ) : null}
       {error ? (
-        <div className="mt-4 rounded-[20px] bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
+        <div className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
       ) : null}
       {isSaving && uploadStatus ? (
-        <div className="mt-4 rounded-[20px] bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
           {uploadStatus}
         </div>
       ) : null}
 
-      <button
-        type="submit"
-        disabled={isSaving}
-        className="mt-6 flex min-h-16 w-full items-center justify-center rounded-full bg-orange-600 px-6 text-base font-semibold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-70"
-      >
-        {isSaving ? uploadStatus || "Updating..." : "Update timings"}
-      </button>
+      {activeStep === 3 ? (
+        <div className="mt-6 hidden flex-wrap gap-2 sm:flex">
+          <button
+            type="button"
+            onClick={goToPreviousStep}
+            className="min-h-11 rounded-xl border border-stone-300 bg-stone-50 px-5 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
+          >
+            Back
+          </button>
+          <button
+            type="submit"
+            disabled={isSaving}
+            className="flex min-h-12 flex-1 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#4f46e5_0%,#315ae9_42%,#2563eb_100%)] px-6 text-base font-semibold text-white transition hover:brightness-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {isSaving ? uploadStatus || "Updating..." : "Publish update"}
+          </button>
+        </div>
+      ) : null}
+
+      <div className="fixed inset-x-3 bottom-3 z-20 rounded-xl border border-stone-200 bg-white/95 p-2 shadow-lg backdrop-blur sm:hidden">
+        <div className="mx-auto flex max-w-4xl items-center gap-2">
+          {activeStep > 1 ? (
+            <button
+              type="button"
+              onClick={goToPreviousStep}
+              className="min-h-10 rounded-lg border border-stone-300 bg-stone-50 px-3 text-sm font-semibold text-stone-700"
+            >
+              Back
+            </button>
+          ) : null}
+
+          {activeStep === 1 ? (
+            <>
+              <button
+                type="button"
+                onClick={() => moveToStep(2)}
+                className="min-h-10 rounded-lg border border-stone-300 bg-stone-50 px-3 text-xs font-semibold text-stone-700"
+              >
+                Manual entry
+              </button>
+              <button
+                type="button"
+                onClick={goToNextStep}
+                className="min-h-10 flex-1 rounded-lg bg-[linear-gradient(135deg,#4f46e5_0%,#315ae9_42%,#2563eb_100%)] px-4 text-sm font-semibold text-white"
+              >
+                Continue
+              </button>
+            </>
+          ) : null}
+
+          {activeStep === 2 ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (!hasAnyPrayerValue) {
+                  setError("Add at least one prayer or Juma timing before continuing.");
+                  return;
+                }
+                goToNextStep();
+              }}
+              className="min-h-10 flex-1 rounded-lg bg-[linear-gradient(135deg,#4f46e5_0%,#315ae9_42%,#2563eb_100%)] px-4 text-sm font-semibold text-white"
+            >
+              Continue
+            </button>
+          ) : null}
+
+          {activeStep === 3 ? (
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="min-h-10 flex-1 rounded-lg bg-[linear-gradient(135deg,#4f46e5_0%,#315ae9_42%,#2563eb_100%)] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {isSaving ? uploadStatus || "Updating..." : "Publish"}
+            </button>
+          ) : null}
+        </div>
+      </div>
     </form>
   );
+}
+
+function getUpdateDraftStorageKey(qrToken: string, placeId?: string) {
+  return `namaz-route-update-draft:${qrToken}:${placeId || "no-place"}`;
+}
+
+function readUpdateDraft(key: string) {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) {
+      return null;
+    }
+
+    return JSON.parse(raw) as UpdateDraft;
+  } catch {
+    window.sessionStorage.removeItem(key);
+    return null;
+  }
+}
+
+function buildReviewItems(input: {
+  prayers: PrayerTimes;
+  baselinePrayers: PrayerTimes;
+  juma1: string;
+  baselineJuma1: string;
+  juma2: string;
+  baselineJuma2: string;
+  remarks: string;
+  baselineRemarks: string;
+  newImagesCount: number;
+}) {
+  const items: string[] = [];
+
+  for (const prayer of Object.keys(input.prayers) as Array<keyof PrayerTimes>) {
+    if ((input.prayers[prayer] || "") !== (input.baselinePrayers[prayer] || "")) {
+      items.push(`${capitalize(prayer)} changed`);
+    }
+  }
+
+  if (input.juma1 !== input.baselineJuma1) {
+    items.push("Juma 1 changed");
+  }
+
+  if (input.juma2 !== input.baselineJuma2) {
+    items.push("Juma 2 changed");
+  }
+
+  if (input.remarks.trim() !== input.baselineRemarks.trim()) {
+    items.push("Remarks updated");
+  }
+
+  if (input.newImagesCount > 0) {
+    items.push(`${input.newImagesCount} new image${input.newImagesCount === 1 ? "" : "s"}`);
+  }
+
+  return items;
+}
+
+function capitalize(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function displayFileType(file: File) {
