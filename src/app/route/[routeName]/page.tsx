@@ -66,7 +66,7 @@ export default async function RouteSeoPage({ params }: PageProps) {
   };
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+    <main className="mx-auto w-full max-w-6xl px-4 py-8 pb-24 sm:pb-8 sm:px-6 lg:px-8">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
 
       <nav className="mb-4 text-xs text-stone-500">
@@ -75,8 +75,18 @@ export default async function RouteSeoPage({ params }: PageProps) {
         <span className="text-stone-700">{route.title}</span>
       </nav>
 
-      <h1 className="text-3xl font-semibold tracking-tight text-stone-900">{route.title}</h1>
-      <p className="mt-2 text-sm text-stone-600">{route.summary}</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight text-stone-900">{route.title}</h1>
+          <p className="mt-2 text-sm text-stone-600">{route.summary}</p>
+        </div>
+        <Link
+          href="/"
+          className="inline-flex min-h-10 items-center rounded-full border border-stone-300 bg-white px-4 text-sm font-semibold text-stone-700 hover:border-stone-400 hover:bg-stone-50"
+        >
+          Go to Home
+        </Link>
+      </div>
 
       <section className="mt-6 rounded-[20px] border border-stone-200 bg-white p-5">
         <h2 className="text-xl font-semibold text-stone-900">Traveller prayer stops</h2>
@@ -131,6 +141,31 @@ export default async function RouteSeoPage({ params }: PageProps) {
           ))}
         </div>
       </section>
+
+      <section className="mt-6 rounded-[18px] border border-stone-200 bg-white p-4">
+        <h2 className="text-lg font-semibold text-stone-900">Need a different route?</h2>
+        <p className="mt-2 text-sm text-stone-600">
+          Go back to the homepage to search by your current location and find nearby masjids instantly.
+        </p>
+        <div className="mt-3">
+          <Link
+            href="/"
+            className="inline-flex min-h-10 items-center rounded-full bg-[linear-gradient(135deg,#4f46e5_0%,#315ae9_42%,#2563eb_100%)] px-4 text-sm font-semibold text-white"
+          >
+            Open Home Search
+          </Link>
+        </div>
+      </section>
+
+      {/* Sticky mobile home-search bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-stone-200 bg-white/90 px-4 py-3 backdrop-blur sm:hidden">
+        <Link
+          href="/"
+          className="flex w-full items-center justify-center rounded-full bg-[linear-gradient(135deg,#4f46e5_0%,#315ae9_42%,#2563eb_100%)] py-3 text-sm font-semibold text-white shadow"
+        >
+          Search nearby masjids
+        </Link>
+      </div>
     </main>
   );
 }

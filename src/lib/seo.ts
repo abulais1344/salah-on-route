@@ -1,4 +1,23 @@
-import type { MosqueView } from "@/types/mosque";
+// ...existing code...
+// Add a helper for Jummah landing SEO
+export function buildJummahSeoMeta(data: {
+  displayName: string;
+  lastUpdatedDisplay: string;
+  masjids: { name: string; address: string; jummah: string | null }[];
+}) {
+  const title = `Jummah Namaz Timings in ${data.displayName} Today`;
+  const description = `Find latest Friday prayer (Jummah) timings for all major masjids in ${data.displayName}. Updated: ${data.lastUpdatedDisplay}.`;
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+    },
+    alternates: {},
+    // Add more SEO fields as needed
+  };
+}import type { MosqueView } from "@/types/mosque";
 
 export interface RouteSeoPage {
   slug: string;

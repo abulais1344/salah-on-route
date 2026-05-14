@@ -1,4 +1,39 @@
-import { demoMosques } from "@/lib/demo-data";
+// ...existing code...
+// Add a helper to get Jummah landing data for a location
+import { demoMosques } from "./demo-data";
+
+export async function getJummahLandingData(location: string) {
+  // For demo: match city/locality from slug
+  const all = demoMosques;
+  const loc = location.toLowerCase();
+  const masjids = all.filter((m) =>
+    m.city?.toLowerCase() === loc ||
+    m.locality?.toLowerCase() === loc ||
+    `${m.city?.toLowerCase()}/${m.locality?.toLowerCase()}` === loc
+  );
+  if (!masjids.length) return null;
+  const formatLastUpdated = (iso: string | undefined) => {
+    if (!iso) return "-";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "-";
+    return d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+  return {
+    displayName: location.split("/").map((s) => s[0]?.toUpperCase() + s.slice(1)).join(", "),
+    lastUpdatedDisplay: formatLastUpdated(masjids[0]?.lastUpdated),
+    masjids: masjids.map((m) => ({
+      id: m.id,
+      name: m.name,
+      address: m.address,
+      qrToken: m.qrToken,
+      latitude: m.latitude,
+      longitude: m.longitude,
+      placeId: m.placeId ?? null,
+      jummah: m.juma1 || null,
+      lastUpdatedDisplay: formatLastUpdated(m.lastUpdated),
+    })),
+  };
+}
 import { haversineDistanceKm } from "@/lib/geo";
 import {
   getNextJamaat,
@@ -69,6 +104,7 @@ export async function listMosques(options?: {
 }) {
   const mosques = await listMosqueRecords();
 
+// (removed duplicate import)
   const decorated = mosques.map((mosque) => decorateMosque(mosque, options));
   return decorated
     .filter((mosque) => {

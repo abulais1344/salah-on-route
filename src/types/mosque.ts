@@ -51,6 +51,8 @@ export interface MosqueRecord {
   lastUpdated: string;
   isVerified: boolean;
   images: MosqueImage[];
+  city?: string;
+  locality?: string;
 }
 
 export interface MosqueView extends MosqueRecord {
