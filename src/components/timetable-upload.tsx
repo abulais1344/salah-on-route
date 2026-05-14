@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { recognize } from "tesseract.js";
 
+import { extractPrayerTimes } from "@/lib/extract-prayer-times";
 import type { ExtractedPrayerTimes } from "@/lib/extract-prayer-times";
 
 interface TimetableUploadProps {
