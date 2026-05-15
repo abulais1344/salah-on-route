@@ -89,8 +89,8 @@ const OUTLIER_THRESHOLD_MINUTES = 55;
 const TEMPLATE_INFER_MAX_DRIFT = 65;
 
 const PRAYER_ALIASES: Record<keyof ExtractedPrayerTimes, string[]> = {
-  fajr: ["fajr", "fajar", "fazr", "faj"],
-  zuhr: ["zuhr", "zuhur", "dhuhr", "zohr", "zohar"],
+  fajr: ["fajr", "fajar", "fazr", "faj", "fair", "foir", "foir"],
+  zuhr: ["zuhr", "zuhur", "dhuhr", "zohr", "zohar", "zuhar"],
   asr: ["asr", "asar"],
   maghrib: ["maghrib", "magrib", "magribh"],
   isha: ["isha", "esha"],
