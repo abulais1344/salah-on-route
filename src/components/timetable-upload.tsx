@@ -390,54 +390,89 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-stone-500">
             Step 2: Review timings
           </p>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {(
-              [
-                ["fajr", "Fajr"],
-                ["zuhr", "Zuhr"],
-                ["asr", "Asr"],
-                ["maghrib", "Maghrib"],
-                ["isha", "Isha"],
-                ["jumma", "Jumma"],
-              ] as const
-            ).map(([field, label]) => (
-              <label
-                key={field}
-                className={`space-y-1 rounded-lg p-1.5 text-xs text-stone-600 ${
-                  detectedTimes[field]
-                    ? `bg-emerald-50 ring-1 ring-emerald-200 ${
-                        ocrStep === "done"
-                          ? "motion-safe:animate-[ocr-detected-pop_680ms_ease-out]"
-                          : ""
-                      }`
-                    : ""
-                }`}
-              >
-                <span className="flex items-center justify-between gap-2">
-                  <span className="font-semibold uppercase tracking-[0.08em] text-stone-500">{label}</span>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${getFieldStatusStyle(
-                      field,
-                      editableTimes,
-                      detectedTimes,
-                      detectedProvenance,
-                    )}`}
-                  >
-                    {getFieldStatusLabel(field, editableTimes, detectedTimes, detectedProvenance)}
-                  </span>
-                </span>
-                <input
-                  type="time"
-                  value={editableTimes[field] || ""}
-                  onChange={(event) => updateTime(field, event.target.value)}
-                  className={`min-h-10 w-full rounded-lg px-2 text-sm text-stone-900 focus:border-blue-300 focus:outline-none ${
+          <div className="rounded-lg border border-stone-200 bg-white p-2.5 sm:p-3">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-500">
+              Daily prayers
+            </p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {(
+                [
+                  ["fajr", "Fajr"],
+                  ["zuhr", "Zuhr"],
+                  ["asr", "Asr"],
+                  ["maghrib", "Maghrib"],
+                  ["isha", "Isha"],
+                ] as const
+              ).map(([field, label]) => (
+                <label
+                  key={field}
+                  className={`space-y-1 rounded-lg border p-1.5 text-xs text-stone-600 ${
                     detectedTimes[field]
-                      ? "border border-emerald-300 bg-white"
-                      : "border border-stone-300 bg-stone-50"
+                      ? "border-emerald-200 bg-emerald-50/40"
+                      : "border-stone-200 bg-stone-50"
                   }`}
-                />
-              </label>
-            ))}
+                >
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="font-semibold uppercase tracking-[0.08em] text-stone-500">{label}</span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${getFieldStatusStyle(
+                        field,
+                        editableTimes,
+                        detectedTimes,
+                        detectedProvenance,
+                      )}`}
+                    >
+                      {getFieldStatusLabel(field, editableTimes, detectedTimes, detectedProvenance)}
+                    </span>
+                  </span>
+                  <input
+                    type="time"
+                    value={editableTimes[field] || ""}
+                    onChange={(event) => updateTime(field, event.target.value)}
+                    className={`min-h-10 w-full rounded-lg px-2 text-sm text-stone-900 focus:border-blue-300 focus:outline-none ${
+                      detectedTimes[field]
+                        ? "border border-emerald-200 bg-white"
+                        : "border border-stone-300 bg-stone-50"
+                    }`}
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-stone-200 bg-white p-2.5 sm:p-3">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-500">
+              Jummah
+            </p>
+            <label
+              className={`block space-y-1 rounded-lg border p-1.5 text-xs text-stone-600 ${
+                detectedTimes.jumma ? "border-emerald-200 bg-emerald-50/40" : "border-stone-200 bg-stone-50"
+              }`}
+            >
+              <span className="flex items-center justify-between gap-2">
+                <span className="font-semibold uppercase tracking-[0.08em] text-stone-500">Jumma</span>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${getFieldStatusStyle(
+                    "jumma",
+                    editableTimes,
+                    detectedTimes,
+                    detectedProvenance,
+                  )}`}
+                >
+                  {getFieldStatusLabel("jumma", editableTimes, detectedTimes, detectedProvenance)}
+                </span>
+              </span>
+              <input
+                type="time"
+                value={editableTimes.jumma || ""}
+                onChange={(event) => updateTime("jumma", event.target.value)}
+                className={`min-h-10 w-full rounded-lg px-2 text-sm text-stone-900 focus:border-blue-300 focus:outline-none ${
+                  detectedTimes.jumma
+                    ? "border border-emerald-200 bg-white"
+                    : "border border-stone-300 bg-stone-50"
+                }`}
+              />
+            </label>
           </div>
 
           <button
@@ -548,19 +583,19 @@ function getFieldStatusStyle(
   if (detectedTimes[field]) {
     const provenance = detectedProvenance[field];
     if (provenance === "corrected") {
-      return "bg-violet-100 text-violet-700";
+      return "border border-violet-200 bg-violet-50 text-violet-700";
     }
     if (provenance === "inferred") {
-      return "bg-blue-100 text-blue-700";
+      return "border border-blue-200 bg-blue-50 text-blue-700";
     }
-    return "bg-emerald-100 text-emerald-700";
+    return "border border-emerald-200 bg-emerald-50 text-emerald-700";
   }
 
   if (editableTimes[field]) {
-    return "bg-amber-100 text-amber-700";
+    return "border border-amber-200 bg-amber-50 text-amber-700";
   }
 
-  return "bg-stone-100 text-stone-600";
+  return "border border-stone-200 bg-stone-50 text-stone-600";
 }
 
 async function safeParseOcrResponse(response: Response) {
