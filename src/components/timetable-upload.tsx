@@ -208,10 +208,7 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
 
       setOcrStep("matching");
       const rawText = ocrResult.data?.text?.trim() || "";
-      console.log("🔍 RAW OCR TEXT:", rawText);
-      console.log("📊 OCR TEXT LENGTH:", rawText.length, "chars");
       const extracted = extractPrayerTimesWithProvenance(rawText);
-      console.log("✅ EXTRACTED RESULTS:", extracted);
       setEditableTimes(extracted.times);
       setDetectedTimes(extracted.times);
       setDetectedProvenance(extracted.provenance);
@@ -277,47 +274,34 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.1em] text-blue-700">
-            Upload timetable photo
+            Step 1: Scan timetable photo
           </p>
           <p className="mt-1 text-xs text-stone-600 sm:text-sm">
-            Add photo, review timings, apply.
+            Choose image source, run scan, then review timings.
           </p>
         </div>
       </div>
 
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        {[
-          { step: "1", label: "Add", active: ocrStep !== "idle" || Boolean(selectedFile) },
-          { step: "2", label: "Review", active: ocrStep === "matching" || ocrStep === "done" },
-          { step: "3", label: "Apply", active: ocrStep === "done" },
-        ].map(({ step, label, active }) => (
-          <span
-            key={step}
-            className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold ${
-              active
-                ? "border-blue-300 bg-blue-50 text-blue-800"
-                : "border-stone-300 bg-stone-50 text-stone-600"
-            }`}
-          >
-            {step}. {label}
-          </span>
-        ))}
+      <div className="mt-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+        {ocrStep === "done"
+          ? "Scan complete. Review timings below, confirm, then apply."
+          : "Pick a photo source first, then tap Read timetable."}
       </div>
 
       <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1.4fr]">
         <div className="space-y-2.5">
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => uploadInputRef.current?.click()}
-              className="min-h-11 rounded-xl border border-stone-300 bg-stone-50 px-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 sm:px-4"
+              className="min-h-11 rounded-xl border border-blue-200 bg-blue-50 px-3 text-sm font-semibold text-blue-800 transition hover:bg-blue-100"
             >
               Upload image
             </button>
             <button
               type="button"
               onClick={() => captureInputRef.current?.click()}
-              className="min-h-11 rounded-xl border border-stone-300 bg-stone-50 px-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 sm:px-4"
+              className="min-h-11 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100"
             >
               Capture image
             </button>
@@ -370,7 +354,7 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
             type="button"
             onClick={() => void runOcr()}
             disabled={!selectedFile || isProcessing}
-            className="min-h-10 w-full rounded-lg bg-[linear-gradient(135deg,#4f46e5_0%,#315ae9_42%,#2563eb_100%)] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70"
+            className="min-h-11 w-full rounded-lg bg-[linear-gradient(135deg,#4f46e5_0%,#315ae9_42%,#2563eb_100%)] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70"
           >
             {isProcessing
               ? ocrStep === "preparing"
@@ -381,26 +365,31 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
               : "Read timetable"}
           </button>
 
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-            <button
-              type="button"
-              onClick={() => void runOcr()}
-              disabled={!selectedFile || isProcessing}
-              className="min-h-10 rounded-lg border border-stone-300 bg-stone-50 px-3 text-xs font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-70 sm:px-4"
-            >
-              Scan again
-            </button>
-            <button
-              type="button"
-              onClick={clearDetectedValues}
-              className="min-h-10 rounded-lg border border-stone-300 bg-stone-50 px-3 text-xs font-semibold text-stone-700 transition hover:bg-stone-100 sm:px-4"
-            >
-              Clear detected values
-            </button>
-          </div>
+          {ocrStep === "done" ? (
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              <button
+                type="button"
+                onClick={() => void runOcr()}
+                disabled={!selectedFile || isProcessing}
+                className="font-semibold text-blue-700 transition hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                Scan again
+              </button>
+              <button
+                type="button"
+                onClick={clearDetectedValues}
+                className="font-semibold text-stone-600 transition hover:text-stone-800"
+              >
+                Clear detected values
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <div className="space-y-3 rounded-xl border border-stone-200 bg-stone-50 p-2.5 sm:p-3.5">
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-stone-500">
+            Step 2: Review timings
+          </p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {(
               [
@@ -455,15 +444,15 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
             type="button"
             onClick={applyToUpdateForm}
             disabled={(hasDetectedValues && !hasVerifiedDetectedData) || qualityReport.hasCriticalIssues}
-            className="min-h-10 w-full rounded-lg border border-stone-300 bg-white px-4 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
+            className="min-h-11 w-full rounded-lg bg-[linear-gradient(135deg,#4f46e5_0%,#315ae9_42%,#2563eb_100%)] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70"
           >
-            Apply to update form
+            Step 3: Apply to update form
           </button>
 
-          <div className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs">
-            <p className="font-semibold text-stone-700">
-              Scan confidence: {qualityReport.confidence === "high" ? "High" : qualityReport.confidence === "medium" ? "Medium" : "Low"}
-            </p>
+          <details className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs">
+            <summary className="cursor-pointer font-semibold text-stone-700">
+              Scan details ({qualityReport.confidence === "high" ? "High" : qualityReport.confidence === "medium" ? "Medium" : "Low"} confidence)
+            </summary>
             <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
               <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700">Detected</span>
               <span className="rounded-full bg-blue-100 px-2 py-0.5 text-blue-700">Auto-filled</span>
@@ -484,7 +473,7 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
             ) : (
               <p className="mt-1.5 text-emerald-700">No logical conflicts detected.</p>
             )}
-          </div>
+          </details>
 
           {hasDetectedValues ? (
             <label className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
@@ -500,7 +489,7 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
                 className="mt-0.5 h-4 w-4 rounded border-amber-300 text-blue-600 focus:ring-blue-500"
               />
               <span>
-                I reviewed the detected timings against the timetable photo and confirmed they are correct.
+                I checked these timings against the photo.
               </span>
             </label>
           ) : null}
