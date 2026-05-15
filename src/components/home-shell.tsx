@@ -105,6 +105,8 @@ export function HomeShell() {
   const [sourceSuggestions, setSourceSuggestions] = useState<PlaceSuggestion[]>([]);
   const [destinationSuggestions, setDestinationSuggestions] = useState<PlaceSuggestion[]>([]);
   const [activeSuggestionField, setActiveSuggestionField] = useState<"source" | "destination" | null>(null);
+  const [isGettingRouteLocation, setIsGettingRouteLocation] = useState(false);
+  const [routeSourceLocationName, setRouteSourceLocationName] = useState<string | null>(null);
   const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
   const geocoderRef = useRef<google.maps.Geocoder | null>(null);
   const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
@@ -626,6 +628,43 @@ export function HomeShell() {
     );
   }
 
+  async function handleUseCurrentLocationForRoute() {
+    setIsGettingRouteLocation(true);
+
+    if (!("geolocation" in navigator)) {
+      setRouteStatus("Location is not supported on this device/browser.");
+      setIsGettingRouteLocation(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          };
+
+          // Reverse geocode to get readable address
+          const areaLabel = await resolveAreaLabel(location);
+          setRouteSourceLocationName(areaLabel);
+          setSource(areaLabel);
+          setActiveSuggestionField("destination");
+          setRouteStatus("");
+        } catch (error) {
+          setRouteStatus("Unable to get location. Please enter starting point manually.");
+        } finally {
+          setIsGettingRouteLocation(false);
+        }
+      },
+      () => {
+        setRouteStatus("Location access is blocked. Please enter starting point manually.");
+        setIsGettingRouteLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  }
+
   async function resolveAreaLabel(location: GeoPoint) {
     const cacheKey = `${location.latitude.toFixed(3)},${location.longitude.toFixed(3)}`;
     const cached = areaLabelCacheRef.current.get(cacheKey);
@@ -1029,6 +1068,38 @@ export function HomeShell() {
                 void handleRouteSearch();
               }}
             >
+              {/* Current location suggestion for route */}
+              {!source.trim() && !routeSourceLocationName ? (
+                <div className={`mb-3 rounded-[14px] border px-3 py-2.5 text-xs text-stone-700 ${theme.promptWrap}`}>
+                  <div className="flex items-center gap-2">
+                    <svg className="h-4 w-4 flex-shrink-0 text-stone-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <p className="font-medium text-stone-800">Start from your current location?</p>
+                  </div>
+                  <p className="mt-1 text-stone-600">
+                    We&apos;ll use your location to find masjids along the route.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleUseCurrentLocationForRoute()}
+                      disabled={isGettingRouteLocation}
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${theme.promptPrimary} disabled:opacity-60`}
+                    >
+                      {isGettingRouteLocation ? "Getting location..." : "Use my location"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRouteSourceLocationName("dismissed")}
+                      className="rounded-full border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 transition hover:bg-stone-100"
+                    >
+                      Enter manually
+                    </button>
+                  </div>
+                </div>
+              ) : null}
               <div className="relative overflow-visible rounded-[16px] border border-stone-200 bg-stone-50/70">
                 <div className="relative">
                   <div className="pointer-events-none absolute left-4 top-1/2 z-10 flex -translate-y-1/2 items-center gap-2 text-stone-500">
