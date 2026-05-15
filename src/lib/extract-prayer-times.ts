@@ -126,6 +126,8 @@ export function extractPrayerTimesWithProvenance(rawText: string): ExtractedPray
     .map((line) => line.trim())
     .filter(Boolean);
 
+  console.log("🔧 NORMALIZED LINES:", lines);
+
   const extracted: ExtractedPrayerTimes = {
     fajr: null,
     zuhr: null,
@@ -148,6 +150,7 @@ export function extractPrayerTimesWithProvenance(rawText: string): ExtractedPray
 
     const directLineMatch = findTimeFromPrayerLines(lines, aliases, prayer);
     if (directLineMatch) {
+      console.log(`✓ ${prayer} DIRECT MATCH:`, directLineMatch);
       extracted[prayer] = directLineMatch;
       provenance[prayer] = "detected";
       continue;
@@ -155,12 +158,14 @@ export function extractPrayerTimesWithProvenance(rawText: string): ExtractedPray
 
     const nearbyMatch = findTimeNearAlias(normalizedText, aliases, prayer);
     if (nearbyMatch) {
+      console.log(`✓ ${prayer} NEARBY MATCH:`, nearbyMatch);
       extracted[prayer] = nearbyMatch;
       provenance[prayer] = "detected";
     }
   }
 
   if (countExtractedTimes(extracted) < 3) {
+    console.log("ℹ️ FEWER THAN 3 PRAYERS DETECTED - USING FALLBACK");
     mergeSequentialFallback(extracted, normalizedText, provenance);
   }
 

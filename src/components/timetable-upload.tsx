@@ -208,7 +208,10 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
 
       setOcrStep("matching");
       const rawText = ocrResult.data?.text?.trim() || "";
+      console.log("🔍 RAW OCR TEXT:", rawText);
+      console.log("📊 OCR TEXT LENGTH:", rawText.length, "chars");
       const extracted = extractPrayerTimesWithProvenance(rawText);
+      console.log("✅ EXTRACTED RESULTS:", extracted);
       setEditableTimes(extracted.times);
       setDetectedTimes(extracted.times);
       setDetectedProvenance(extracted.provenance);
