@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PSM, createWorker } from "tesseract.js";
 
-import { extractPrayerTimes } from "@/lib/extract-prayer-times";
+import {
+  analyzeExtractedPrayerTimes,
+  extractPrayerTimesWithProvenance,
+  type ExtractionProvenanceMap,
+} from "@/lib/extract-prayer-times";
 import type { ExtractedPrayerTimes } from "@/lib/extract-prayer-times";
 
 interface TimetableUploadProps {
@@ -25,6 +29,7 @@ type OcrStep = "idle" | "preparing" | "reading" | "matching" | "done";
 interface StoredOcrDraft {
   editableTimes: ExtractedPrayerTimes;
   detectedTimes: ExtractedPrayerTimes;
+  detectedProvenance?: ExtractionProvenanceMap;
   rawText: string;
   imagePreviewDataUrl: string | null;
   fileName: string | null;
@@ -40,6 +45,15 @@ const EMPTY_EXTRACTED: ExtractedPrayerTimes = {
   maghrib: null,
   isha: null,
   jumma: null,
+};
+
+const EMPTY_PROVENANCE: ExtractionProvenanceMap = {
+  fajr: "missing",
+  zuhr: "missing",
+  asr: "missing",
+  maghrib: "missing",
+  isha: "missing",
+  jumma: "missing",
 };
 
 export function TimetableUpload({ onApply }: TimetableUploadProps) {
@@ -59,6 +73,9 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
   const [detectedTimes, setDetectedTimes] = useState<ExtractedPrayerTimes>(
     () => readStoredOcrDraft()?.detectedTimes || EMPTY_EXTRACTED,
   );
+  const [detectedProvenance, setDetectedProvenance] = useState<ExtractionProvenanceMap>(
+    () => readStoredOcrDraft()?.detectedProvenance || EMPTY_PROVENANCE,
+  );
   const [rawText, setRawText] = useState(() => readStoredOcrDraft()?.rawText || "");
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +88,7 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
   const [ocrStep, setOcrStep] = useState<OcrStep>(() => readStoredOcrDraft()?.ocrStep || "idle");
   const [hasVerifiedDetectedData, setHasVerifiedDetectedData] = useState(false);
   const hasDetectedValues = Object.values(detectedTimes).some(Boolean);
+  const qualityReport = useMemo(() => analyzeExtractedPrayerTimes(editableTimes), [editableTimes]);
 
   const previewUrl = useMemo(() => {
     if (!selectedFile) {
@@ -118,6 +136,7 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
     const draft: StoredOcrDraft = {
       editableTimes,
       detectedTimes,
+      detectedProvenance,
       rawText,
       imagePreviewDataUrl: storedPreviewDataUrl,
       fileName: selectedFile?.name || selectedFileName,
@@ -129,6 +148,7 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
     window.sessionStorage.setItem(storageKey, JSON.stringify(draft));
   }, [
     detectedTimes,
+    detectedProvenance,
     editableTimes,
     message,
     ocrStep,
@@ -188,14 +208,15 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
 
       setOcrStep("matching");
       const rawText = ocrResult.data?.text?.trim() || "";
-      const extracted = extractPrayerTimes(rawText);
-      setEditableTimes(extracted);
-      setDetectedTimes(extracted);
+      const extracted = extractPrayerTimesWithProvenance(rawText);
+      setEditableTimes(extracted.times);
+      setDetectedTimes(extracted.times);
+      setDetectedProvenance(extracted.provenance);
       setRawText(rawText);
       setOcrStep("done");
       setHasVerifiedDetectedData(false);
 
-      const hasAnyExtractedValue = Object.values(extracted).some(Boolean);
+      const hasAnyExtractedValue = Object.values(extracted.times).some(Boolean);
       if (hasAnyExtractedValue) {
         setMessage("Done. Review each detected timing, correct anything needed, then verify before applying.");
       } else {
@@ -224,6 +245,11 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
       return;
     }
 
+    if (qualityReport.hasCriticalIssues) {
+      setError("Detected timings still have logical conflicts. Please fix highlighted issues first.");
+      return;
+    }
+
     onApply(editableTimes);
     setMessage("Timings applied to the form below. You can still edit before submit.");
   }
@@ -231,6 +257,7 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
   function clearDetectedValues() {
     setEditableTimes(EMPTY_EXTRACTED);
     setDetectedTimes(EMPTY_EXTRACTED);
+    setDetectedProvenance(EMPTY_PROVENANCE);
     setRawText("");
     setSelectedFile(null);
     setSelectedFileName(null);
@@ -401,9 +428,10 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
                       field,
                       editableTimes,
                       detectedTimes,
+                      detectedProvenance,
                     )}`}
                   >
-                    {getFieldStatusLabel(field, editableTimes, detectedTimes)}
+                    {getFieldStatusLabel(field, editableTimes, detectedTimes, detectedProvenance)}
                   </span>
                 </span>
                 <input
@@ -423,11 +451,37 @@ export function TimetableUpload({ onApply }: TimetableUploadProps) {
           <button
             type="button"
             onClick={applyToUpdateForm}
-            disabled={hasDetectedValues && !hasVerifiedDetectedData}
+            disabled={(hasDetectedValues && !hasVerifiedDetectedData) || qualityReport.hasCriticalIssues}
             className="min-h-10 w-full rounded-lg border border-stone-300 bg-white px-4 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
           >
             Apply to update form
           </button>
+
+          <div className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs">
+            <p className="font-semibold text-stone-700">
+              Scan confidence: {qualityReport.confidence === "high" ? "High" : qualityReport.confidence === "medium" ? "Medium" : "Low"}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700">Detected</span>
+              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-blue-700">Auto-filled</span>
+              <span className="rounded-full bg-violet-100 px-2 py-0.5 text-violet-700">Auto-corrected</span>
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-700">Manual</span>
+            </div>
+            {qualityReport.issues.length > 0 ? (
+              <div className="mt-1.5 space-y-1">
+                {qualityReport.issues.map((issue) => (
+                  <p
+                    key={issue.code}
+                    className={issue.severity === "critical" ? "text-rose-700" : "text-amber-700"}
+                  >
+                    • {issue.message}
+                  </p>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-1.5 text-emerald-700">No logical conflicts detected.</p>
+            )}
+          </div>
 
           {hasDetectedValues ? (
             <label className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
@@ -473,8 +527,16 @@ function getFieldStatusLabel(
   field: keyof ExtractedPrayerTimes,
   editableTimes: ExtractedPrayerTimes,
   detectedTimes: ExtractedPrayerTimes,
+  detectedProvenance: ExtractionProvenanceMap,
 ) {
   if (detectedTimes[field]) {
+    const provenance = detectedProvenance[field];
+    if (provenance === "corrected") {
+      return "Auto-corrected";
+    }
+    if (provenance === "inferred") {
+      return "Auto-filled";
+    }
     return "Detected";
   }
 
@@ -489,8 +551,16 @@ function getFieldStatusStyle(
   field: keyof ExtractedPrayerTimes,
   editableTimes: ExtractedPrayerTimes,
   detectedTimes: ExtractedPrayerTimes,
+  detectedProvenance: ExtractionProvenanceMap,
 ) {
   if (detectedTimes[field]) {
+    const provenance = detectedProvenance[field];
+    if (provenance === "corrected") {
+      return "bg-violet-100 text-violet-700";
+    }
+    if (provenance === "inferred") {
+      return "bg-blue-100 text-blue-700";
+    }
     return "bg-emerald-100 text-emerald-700";
   }
 
