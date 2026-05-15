@@ -372,6 +372,10 @@ function inferUsingAdjacentPrayerGaps(
 
     // Both exist but gap implausible: prefer candidate adjustment for the right prayer.
     if (leftValue && rightValue) {
+      if (provenance[edge.left] === "detected" && provenance[edge.right] === "detected") {
+        continue;
+      }
+
       const leftMinutes = toMinutes(leftValue);
       const rightMinutes = toMinutes(rightValue);
       const gap = rightMinutes - leftMinutes;
@@ -644,6 +648,10 @@ function correctOutlierDailyTimes(
       continue;
     }
 
+    if (provenance[prayer] === "detected") {
+      continue;
+    }
+
     const currentMinutes = toMinutes(value);
     const expectedMinutes = clampMinutes(PRAYER_TYPICAL_MINUTES[prayer] + drift, PRAYER_MINUTE_RANGES[prayer]);
     const deviation = Math.abs(currentMinutes - expectedMinutes);
@@ -760,11 +768,17 @@ function findTimeFromPrayerLines(lines: string[], aliases: string[], prayer: Pra
       continue;
     }
 
+    const sameLineCandidates = extractAllTimes(line, prayer);
+    const sameLine = pickBestPrayerTimeCandidate(sameLineCandidates, prayer, "same-line");
+    if (sameLine) {
+      return sameLine;
+    }
+
     const windowLines = [lines[index - 1], lines[index], lines[index + 1]].filter(
       (value): value is string => Boolean(value),
     );
 
-    const candidate = extractFirstTime(windowLines.join(" "), prayer);
+    const candidate = extractBestTime(windowLines.join(" "), prayer, "window");
     if (candidate) {
       return candidate;
     }
@@ -783,7 +797,7 @@ function findTimeNearAlias(text: string, aliases: string[], prayer: PrayerField)
     }
 
     for (const match of matches) {
-      const candidate = extractFirstTime(match, prayer);
+      const candidate = extractBestTime(match, prayer, "nearby");
       if (candidate) {
         return candidate;
       }
@@ -796,6 +810,49 @@ function findTimeNearAlias(text: string, aliases: string[], prayer: PrayerField)
 function extractFirstTime(text: string, prayer?: PrayerField) {
   const candidates = extractAllTimes(text, prayer);
   return candidates[0] || null;
+}
+
+function extractBestTime(
+  text: string,
+  prayer: PrayerField,
+  context: "same-line" | "window" | "nearby",
+) {
+  const candidates = extractAllTimes(text, prayer);
+  return pickBestPrayerTimeCandidate(candidates, prayer, context);
+}
+
+function pickBestPrayerTimeCandidate(
+  candidates: string[],
+  prayer: PrayerField,
+  context: "same-line" | "window" | "nearby",
+) {
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  if (prayer === "jumma") {
+    const valid = candidates.filter((value) => isLikelyJummaTime(value));
+    if (valid.length === 0) {
+      return null;
+    }
+    return valid.sort((left, right) => toMinutes(right) - toMinutes(left))[0];
+  }
+
+  if (context === "same-line") {
+    // Same row often contains Azan then Jamaat; prefer later value for Jamaat use-case.
+    return [...candidates].sort((left, right) => toMinutes(right) - toMinutes(left))[0];
+  }
+
+  const scored = candidates
+    .map((value) => {
+      const minutes = toMinutes(value);
+      const typicalDistance = Math.abs(minutes - PRAYER_TYPICAL_MINUTES[prayer]);
+      const slightLaterPreference = minutes / 1000;
+      return { value, score: typicalDistance - slightLaterPreference };
+    })
+    .sort((left, right) => left.score - right.score);
+
+  return scored[0]?.value ?? null;
 }
 
 function extractAllTimes(text: string, prayer?: PrayerField) {
