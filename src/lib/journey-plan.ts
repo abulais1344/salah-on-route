@@ -11,6 +11,8 @@ export interface JourneyPrayerStop {
   mosqueId: string;
   mosqueName: string;
   mosqueAddress: string;
+  jumma1: string | null;
+  jumma2: string | null;
   placeId: string | null;
   mosqueLat: number;
   mosqueLng: number;
@@ -124,6 +126,8 @@ export function buildJourneyPrayerPlan({
         mosqueId: entry.mosque.id,
         mosqueName: entry.mosque.name,
         mosqueAddress: entry.mosque.address,
+        jumma1: entry.mosque.juma1 ?? null,
+        jumma2: entry.mosque.juma2 ?? null,
         placeId: entry.mosque.placeId ?? null,
         mosqueLat: entry.mosque.latitude,
         mosqueLng: entry.mosque.longitude,
