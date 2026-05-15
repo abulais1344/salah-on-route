@@ -89,11 +89,11 @@ const OUTLIER_THRESHOLD_MINUTES = 55;
 const TEMPLATE_INFER_MAX_DRIFT = 65;
 
 const PRAYER_ALIASES: Record<keyof ExtractedPrayerTimes, string[]> = {
-  fajr: ["fajr", "fajar", "fazr", "faj"],
-  zuhr: ["zuhr", "zuhur", "dhuhr", "zohr", "zohar"],
-  asr: ["asr", "asar"],
-  maghrib: ["maghrib", "magrib", "magribh"],
-  isha: ["isha", "esha"],
+  fajr: ["fajr", "fajar", "fazr", "faj", "fair", "foir"],
+  zuhr: ["zuhr", "zuhur", "dhuhr", "zohr", "zohar", "zuhar"],
+  asr: ["asr", "asar", "asa", "asaar", "asar"],
+  maghrib: ["maghrib", "magrib", "magribh", "mogrib", "moghrib", "maghrib"],
+  isha: ["isha", "esha", "ishy", "eshaa", "ishaah"],
   jumma: [
     "jumma",
     "juma",
@@ -104,6 +104,8 @@ const PRAYER_ALIASES: Record<keyof ExtractedPrayerTimes, string[]> = {
     "jum ahh",
     "juma1",
     "juma 1",
+    "jumar",
+    "jummar",
     "jamat",
     "jamaat",
     "khutbah",
@@ -125,8 +127,6 @@ export function extractPrayerTimesWithProvenance(rawText: string): ExtractedPray
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
-
-  console.log("🔧 NORMALIZED LINES:", lines);
 
   const extracted: ExtractedPrayerTimes = {
     fajr: null,
@@ -150,7 +150,6 @@ export function extractPrayerTimesWithProvenance(rawText: string): ExtractedPray
 
     const directLineMatch = findTimeFromPrayerLines(lines, aliases, prayer);
     if (directLineMatch) {
-      console.log(`✓ ${prayer} DIRECT MATCH:`, directLineMatch);
       extracted[prayer] = directLineMatch;
       provenance[prayer] = "detected";
       continue;
@@ -158,14 +157,12 @@ export function extractPrayerTimesWithProvenance(rawText: string): ExtractedPray
 
     const nearbyMatch = findTimeNearAlias(normalizedText, aliases, prayer);
     if (nearbyMatch) {
-      console.log(`✓ ${prayer} NEARBY MATCH:`, nearbyMatch);
       extracted[prayer] = nearbyMatch;
       provenance[prayer] = "detected";
     }
   }
 
   if (countExtractedTimes(extracted) < 3) {
-    console.log("ℹ️ FEWER THAN 3 PRAYERS DETECTED - USING FALLBACK");
     mergeSequentialFallback(extracted, normalizedText, provenance);
   }
 

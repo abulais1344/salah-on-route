@@ -701,14 +701,14 @@ export function UpdateForm({ mosque, lastUpdatedDisplay, createFromPlace }: Upda
                 onClick={() => moveToStep(2)}
                 className="min-h-10 rounded-lg border border-stone-300 bg-stone-50 px-3 text-xs font-semibold text-stone-700"
               >
-                Manual entry
+                Skip scan
               </button>
               <button
                 type="button"
                 onClick={goToNextStep}
                 className="min-h-10 flex-1 rounded-lg bg-[linear-gradient(135deg,#4f46e5_0%,#315ae9_42%,#2563eb_100%)] px-4 text-sm font-semibold text-white"
               >
-                Continue
+                Next: Verify timings
               </button>
             </>
           ) : null}

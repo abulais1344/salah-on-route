@@ -10,7 +10,7 @@ import { buildJourneyPrayerPlan, type JourneyPrayerStop } from "@/lib/journey-pl
 import { MosqueCard } from "@/components/mosque-card";
 import type { GeoPoint } from "@/lib/geo";
 import { loadGoogleMaps } from "@/lib/google-maps";
-import { formatPrayerLabel } from "@/lib/jamaat";
+import { formatDisplayTime, formatPrayerLabel } from "@/lib/jamaat";
 import { getGoogleMapsDirectionsUrl } from "@/lib/maps-links";
 import type { MosqueView } from "@/types/mosque";
 
@@ -110,6 +110,17 @@ export function HomeShell() {
   const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
   const areaLabelCacheRef = useRef(new Map<string, string>());
   const suggestionJustSelectedRef = useRef(false);
+
+  const isFridayInIndia = useMemo(() => {
+    const selectedDate = departAt ? new Date(departAt) : new Date();
+    const safeDate = Number.isNaN(selectedDate.getTime()) ? new Date() : selectedDate;
+    const indiaWeekday = new Intl.DateTimeFormat("en-IN", {
+      weekday: "long",
+      timeZone: "Asia/Kolkata",
+    }).format(safeDate);
+
+    return indiaWeekday.toLowerCase() === "friday";
+  }, [departAt]);
 
   function getAutocompleteSessionToken() {
     if (!sessionTokenRef.current) {
@@ -1192,6 +1203,11 @@ export function HomeShell() {
             <p className="mt-1 text-sm text-stone-700">
               Intelligent recommendation based on timing safety, detour, and timing reliability.
             </p>
+            {isFridayInIndia ? (
+              <p className="mt-2 rounded-[12px] border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+                Friday mode: Jummah timings are shown for each recommended mosque when available.
+              </p>
+            ) : null}
             <div className="mt-3 rounded-[16px] border border-emerald-200 bg-white p-3.5 shadow-[0_8px_24px_rgba(16,185,129,0.08)]">
               {(() => {
                 const primary = journeyPlan[0];
@@ -1239,6 +1255,12 @@ export function HomeShell() {
                           ? ` (${primary.estimateConfidence})`
                           : ""}
                       </span>
+                      {isFridayInIndia && primary.jumma1 ? (
+                        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-900">
+                          Jummah {formatDisplayTime(primary.jumma1)}
+                          {primary.jumma2 ? ` • ${formatDisplayTime(primary.jumma2)}` : ""}
+                        </span>
+                      ) : null}
                     </div>
 
                     {primary.estimateExplanation ? (
@@ -1283,42 +1305,71 @@ export function HomeShell() {
                 return (
                   <div
                     key={`${stop.prayer}-${stop.mosqueId}`}
-                    className="flex flex-col gap-2 rounded-[14px] border border-orange-200/70 bg-white px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+                    className="rounded-[14px] border border-orange-200/70 bg-white px-3 py-3"
                   >
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
+                    <div className="min-w-0 space-y-2.5">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
                         <p className="text-sm font-semibold text-stone-900">
                           {formatPrayerLabel(stop.prayer)} at {stop.mosqueName}
                         </p>
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${getPlanUrgencyTone(
-                            stop.urgency,
-                          )}`}
-                        >
-                          {stop.urgency}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${getPlanUrgencyTone(
+                              stop.urgency,
+                            )}`}
+                          >
+                            {stop.urgency}
+                          </span>
+                          <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${getTimingSourceTone(stop.timingSource)}`}>
+                            {stop.timingSource}
+                            {stop.timingSource === "Estimated" && stop.estimateConfidence
+                              ? ` (${stop.estimateConfidence})`
+                              : ""}
+                          </span>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-stone-600">{stop.mosqueAddress}</p>
+
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className="rounded-full bg-stone-100 px-2.5 py-1 text-[11px] font-semibold text-stone-700">
+                          ETA {stop.estimatedArrival}
                         </span>
-                        <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${getTimingSourceTone(stop.timingSource)}`}>
-                          {stop.timingSource}
-                          {stop.timingSource === "Estimated" && stop.estimateConfidence
-                            ? ` (${stop.estimateConfidence})`
-                            : ""}
+                        <span className="rounded-full bg-stone-100 px-2.5 py-1 text-[11px] font-semibold text-stone-700">
+                          Jamaat {stop.prayerTimeDisplay}
+                        </span>
+                        <span className="rounded-full bg-stone-100 px-2.5 py-1 text-[11px] font-semibold text-stone-700">
+                          Wait {stop.waitMinutes} min
+                        </span>
+                        <span className="rounded-full bg-stone-100 px-2.5 py-1 text-[11px] font-semibold text-stone-700">
+                          ~{stop.estimatedDetourMinutes} min detour
                         </span>
                       </div>
-                      <p className="text-xs text-stone-600">
-                        ETA {stop.estimatedArrival} • Jamaat {stop.prayerTimeDisplay} • wait {stop.waitMinutes} min • ~{stop.estimatedDetourMinutes} min detour
-                      </p>
+
+                      {isFridayInIndia && stop.jumma1 ? (
+                        <p className="text-[11px] font-semibold text-amber-800">
+                          Jummah {formatDisplayTime(stop.jumma1)}
+                          {stop.jumma2 ? ` • ${formatDisplayTime(stop.jumma2)}` : ""}
+                        </p>
+                      ) : null}
+
                       {stop.estimateExplanation ? (
-                        <p className="mt-1 text-[11px] text-amber-700">{stop.estimateExplanation}</p>
+                        <p className="rounded-[10px] bg-amber-50 px-2.5 py-2 text-[11px] text-amber-700">
+                          {stop.estimateExplanation}
+                        </p>
                       ) : null}
                     </div>
-                    <a
-                      href={mapsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex min-h-9 items-center self-start rounded-full bg-orange-600 px-3.5 text-xs font-semibold text-white transition hover:bg-orange-700"
-                    >
-                      Navigate
-                    </a>
+
+                    <div className="mt-2 sm:mt-3">
+                      <a
+                        href={mapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex min-h-9 w-full items-center justify-center rounded-full bg-orange-600 px-3.5 text-xs font-semibold text-white transition hover:bg-orange-700 sm:w-auto"
+                      >
+                        Navigate
+                      </a>
+                    </div>
                   </div>
                 );
               })}
