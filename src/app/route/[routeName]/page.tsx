@@ -54,6 +54,11 @@ export default async function RouteSeoPage({ params }: PageProps) {
 
   const mosques = await listMosques();
   const routeMosques = getMosquesForRoute(route, mosques).slice(0, 80);
+  const indiaWeekday = new Intl.DateTimeFormat("en-IN", {
+    weekday: "long",
+    timeZone: "Asia/Kolkata",
+  }).format(new Date());
+  const isFridayInIndia = indiaWeekday.toLowerCase() === "friday";
 
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",
@@ -94,6 +99,13 @@ export default async function RouteSeoPage({ params }: PageProps) {
           Use these mosque stops during road travel. Each entry includes quick navigation and timing details.
         </p>
 
+        {isFridayInIndia ? (
+          <div className="mt-3 rounded-[14px] border border-amber-300 bg-[linear-gradient(135deg,#fff7ed_0%,#fffbeb_100%)] px-3 py-2.5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-800">Friday mode (India)</p>
+            <p className="mt-1 text-sm font-medium text-amber-900">Jummah timings are highlighted below for quick planning.</p>
+          </div>
+        ) : null}
+
         <div className="mt-4 grid gap-3">
           {routeMosques.length > 0 ? (
             routeMosques.map((mosque) => (
@@ -105,6 +117,12 @@ export default async function RouteSeoPage({ params }: PageProps) {
                     <p className="mt-2 text-xs text-stone-500">
                       Fajr {mosque.prayers.fajr ? formatDisplayTime(mosque.prayers.fajr) : "--"} • Zuhr {mosque.prayers.zuhr ? formatDisplayTime(mosque.prayers.zuhr) : "--"} • Asr {mosque.prayers.asr ? formatDisplayTime(mosque.prayers.asr) : "--"}
                     </p>
+                    {isFridayInIndia ? (
+                      <p className="mt-2 inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900 ring-1 ring-amber-300">
+                        Jummah {mosque.juma1 ? formatDisplayTime(mosque.juma1) : "--"}
+                        {mosque.juma2 ? ` • Juma 2 ${formatDisplayTime(mosque.juma2)}` : ""}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="flex gap-2">
                     <a

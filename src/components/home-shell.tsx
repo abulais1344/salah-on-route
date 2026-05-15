@@ -1188,12 +1188,92 @@ export function HomeShell() {
 
         {mode === "route" && journeyPlan.length > 0 ? (
           <div className="mt-3 rounded-[18px] border border-orange-200 bg-orange-50/70 p-3 sm:p-4">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-orange-700">Journey Namaz plan</h3>
+            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-orange-700">Journey Namaz recommendation</h3>
             <p className="mt-1 text-sm text-stone-700">
-              Suggested stops from your route timing. Follow in order while travelling.
+              Intelligent recommendation based on timing safety, detour, and timing reliability.
             </p>
-            <div className="mt-3 grid gap-2.5">
-              {journeyPlan.map((stop) => {
+            <div className="mt-3 rounded-[16px] border border-emerald-200 bg-white p-3.5 shadow-[0_8px_24px_rgba(16,185,129,0.08)]">
+              {(() => {
+                const primary = journeyPlan[0];
+                const mapsUrl = getGoogleMapsDirectionsUrl({
+                  placeId: primary.placeId,
+                  latitude: primary.mosqueLat,
+                  longitude: primary.mosqueLng,
+                });
+
+                return (
+                  <>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Primary recommended stop</p>
+                        <p className="mt-1 text-base font-semibold text-stone-900">
+                          {formatPrayerLabel(primary.prayer)} at {primary.mosqueName}
+                        </p>
+                        <p className="mt-1 text-xs text-stone-600">{primary.mosqueAddress}</p>
+                      </div>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${getPlanUrgencyTone(
+                          primary.urgency,
+                        )}`}
+                      >
+                        {primary.urgency}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <span className="rounded-full bg-stone-100 px-2.5 py-1 text-[11px] font-semibold text-stone-700">
+                        ETA {primary.estimatedArrival}
+                      </span>
+                      <span className="rounded-full bg-stone-100 px-2.5 py-1 text-[11px] font-semibold text-stone-700">
+                        Jamaat {primary.prayerTimeDisplay}
+                      </span>
+                      <span className="rounded-full bg-stone-100 px-2.5 py-1 text-[11px] font-semibold text-stone-700">
+                        Wait {primary.waitMinutes} min
+                      </span>
+                      <span className="rounded-full bg-stone-100 px-2.5 py-1 text-[11px] font-semibold text-stone-700">
+                        ~{primary.estimatedDetourMinutes} min detour
+                      </span>
+                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${getTimingSourceTone(primary.timingSource)}`}>
+                        {primary.timingSource}
+                        {primary.timingSource === "Estimated" && primary.estimateConfidence
+                          ? ` (${primary.estimateConfidence})`
+                          : ""}
+                      </span>
+                    </div>
+
+                    {primary.estimateExplanation ? (
+                      <p className="mt-2 rounded-[12px] bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                        {primary.estimateExplanation}
+                      </p>
+                    ) : null}
+
+                    <div className="mt-3 space-y-1.5">
+                      {primary.recommendationReasons.map((reason) => (
+                        <p key={reason} className="text-xs text-stone-700">
+                          • {reason}
+                        </p>
+                      ))}
+                    </div>
+
+                    <div className="mt-3">
+                      <a
+                        href={mapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex min-h-10 items-center rounded-full bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                      >
+                        Navigate to recommended stop
+                      </a>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {journeyPlan.length > 1 ? (
+              <div className="mt-3 grid gap-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-600">Other possible stops</p>
+                {journeyPlan.slice(1).map((stop) => {
                 const mapsUrl = getGoogleMapsDirectionsUrl({
                   placeId: stop.placeId,
                   latitude: stop.mosqueLat,
@@ -1211,16 +1291,25 @@ export function HomeShell() {
                           {formatPrayerLabel(stop.prayer)} at {stop.mosqueName}
                         </p>
                         <span
-                          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${getPlanConfidenceTone(
-                            stop.confidence,
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${getPlanUrgencyTone(
+                            stop.urgency,
                           )}`}
                         >
-                          {stop.confidence}
+                          {stop.urgency}
+                        </span>
+                        <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${getTimingSourceTone(stop.timingSource)}`}>
+                          {stop.timingSource}
+                          {stop.timingSource === "Estimated" && stop.estimateConfidence
+                            ? ` (${stop.estimateConfidence})`
+                            : ""}
                         </span>
                       </div>
                       <p className="text-xs text-stone-600">
-                        ETA {stop.estimatedArrival} • Jamaat {stop.prayerTimeDisplay} • wait {stop.waitMinutes} min
+                        ETA {stop.estimatedArrival} • Jamaat {stop.prayerTimeDisplay} • wait {stop.waitMinutes} min • ~{stop.estimatedDetourMinutes} min detour
                       </p>
+                      {stop.estimateExplanation ? (
+                        <p className="mt-1 text-[11px] text-amber-700">{stop.estimateExplanation}</p>
+                      ) : null}
                     </div>
                     <a
                       href={mapsUrl}
@@ -1233,7 +1322,8 @@ export function HomeShell() {
                   </div>
                 );
               })}
-            </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </section>
@@ -1338,14 +1428,25 @@ function formatLocalDateTimeInput(date: Date) {
   return new Date(date.getTime() - timezoneOffsetMs).toISOString().slice(0, 16);
 }
 
-function getPlanConfidenceTone(confidence: JourneyPrayerStop["confidence"]) {
-  switch (confidence) {
-    case "On-time":
+function getPlanUrgencyTone(urgency: JourneyPrayerStop["urgency"]) {
+  switch (urgency) {
+    case "Comfortable":
       return "bg-emerald-100 text-emerald-800";
-    case "Tight":
+    case "Tight timing":
       return "bg-amber-100 text-amber-800";
     default:
       return "bg-rose-100 text-rose-700";
+  }
+}
+
+function getTimingSourceTone(source: JourneyPrayerStop["timingSource"]) {
+  switch (source) {
+    case "Verified":
+      return "bg-emerald-100 text-emerald-800";
+    case "Estimated":
+      return "bg-amber-100 text-amber-800";
+    default:
+      return "bg-blue-100 text-blue-800";
   }
 }
 
