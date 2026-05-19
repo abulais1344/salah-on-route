@@ -881,6 +881,14 @@ export function HomeShell() {
                 {heroLanguage === "ur" ? "ہندوستان کیلئے" : heroLanguage === "mr" ? "भारतासाठी तयार" : "India ready"}
               </span>
             </div>
+            <div className="mt-3">
+              <Link
+                href="/flight"
+                className="inline-flex min-h-11 items-center rounded-full border border-white/30 bg-white/15 px-4 text-sm font-semibold text-white transition hover:bg-white/25"
+              >
+                Flight mode: plan airport and in-flight prayers
+              </Link>
+            </div>
           </div>
         </div>
       </section>
