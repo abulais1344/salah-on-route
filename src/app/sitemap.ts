@@ -20,7 +20,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const mosques = await listMosques();
   const citySlugs = getPopularCitySlugs(mosques).slice(0, 40);
-  const mosquePages = mosques.slice(0, 400).map((mosque) => `/masjid/${buildMasjidSlug(mosque)}`);
+  const prioritizedMosques = mosques
+    .filter((mosque) => mosque.isVerified || mosque.hasJamaatData)
+    .slice(0, 250);
+  const mosquePages = prioritizedMosques.map((mosque) => `/masjid/${buildMasjidSlug(mosque)}`);
   const cityPages = citySlugs.map((city) => `/city/${city}`);
   const routePages = ROUTE_SEO_PAGES.map((route) => `/route/${route.slug}`);
   const dynamicPages = [...mosquePages, ...cityPages, ...routePages];
