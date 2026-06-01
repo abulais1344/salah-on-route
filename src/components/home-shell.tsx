@@ -107,6 +107,7 @@ export function HomeShell() {
   const [activeSuggestionField, setActiveSuggestionField] = useState<"source" | "destination" | null>(null);
   const [isGettingRouteLocation, setIsGettingRouteLocation] = useState(false);
   const [routeSourceLocationName, setRouteSourceLocationName] = useState<string | null>(null);
+  const [showTravelGuides, setShowTravelGuides] = useState(false);
   const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
   const geocoderRef = useRef<google.maps.Geocoder | null>(null);
   const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
@@ -742,35 +743,8 @@ export function HomeShell() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 pb-28 sm:px-6 sm:pb-6 lg:px-8">
-      <div className="fixed inset-x-0 bottom-4 z-40 flex justify-center sm:hidden">
-        <div className="mx-4 grid w-full max-w-xs grid-cols-2 gap-2 rounded-[22px] border border-stone-200 bg-white/92 p-2 shadow-[0_18px_40px_rgba(41,37,36,0.18)] backdrop-blur">
-          <button
-            type="button"
-            onClick={() => {
-              setMode("nearby");
-              setActiveSuggestionField(null);
-            }}
-            className={`min-h-11 rounded-[16px] px-4 text-sm font-semibold transition ${
-              mode === "nearby" ? theme.modeActive : theme.modeInactive
-            }`}
-          >
-            Nearby
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode("route");
-              setActiveSuggestionField(null);
-            }}
-            className={`min-h-11 rounded-[16px] px-4 text-sm font-semibold transition ${
-              mode === "route" ? theme.modeActive : theme.modeInactive
-            }`}
-          >
-            Route
-          </button>
-        </div>
-      </div>
+    <>
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 pb-56 sm:px-6 sm:pb-6 lg:px-8">
 
       <section className="relative overflow-hidden rounded-[32px] border border-amber-200/30 bg-[radial-gradient(circle_at_12%_18%,_rgba(251,146,60,0.34),_transparent_34%),radial-gradient(circle_at_85%_20%,_rgba(252,211,77,0.16),_transparent_40%),linear-gradient(130deg,#111827_0%,#1f2937_48%,#312e81_100%)] px-5 py-8 text-white shadow-[0_24px_100px_rgba(15,23,42,0.34)] sm:px-8 sm:py-10">
         <div className="absolute -right-20 -top-20 h-52 w-52 rounded-full bg-orange-300/15 blur-3xl" aria-hidden />
@@ -893,6 +867,67 @@ export function HomeShell() {
         </div>
       </section>
 
+      {/* Collapsible Travel Guides - mobile priority placement */}
+      <section className="sm:hidden">
+        <button
+          type="button"
+          onClick={() => setShowTravelGuides(!showTravelGuides)}
+          className="w-full rounded-[20px] border border-stone-200 bg-gradient-to-r from-orange-50 to-amber-50 px-4 py-3 text-left shadow-[0_8px_24px_rgba(41,37,36,0.04)] transition hover:shadow-[0_12px_32px_rgba(41,37,36,0.08)]"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-orange-700">Travel prayer guides</p>
+              <p className="mt-1 text-sm font-medium text-stone-700">Safar dua, wuzu, qasar namaz & more</p>
+            </div>
+            <svg
+              className={`h-5 w-5 flex-shrink-0 text-stone-600 transition-transform ${showTravelGuides ? "rotate-180" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+            </svg>
+          </div>
+        </button>
+
+        {showTravelGuides && (
+          <div className="mt-2 grid gap-2 rounded-[18px] border border-stone-200 bg-white p-3 shadow-[0_8px_24px_rgba(41,37,36,0.08)]">
+            <div className="grid grid-cols-2 gap-2">
+              <Link
+                href="/travel/safar-dua"
+                className="rounded-[14px] border border-orange-200 bg-orange-50/60 px-3 py-2.5 text-center text-sm font-semibold text-orange-700 transition hover:bg-orange-100"
+              >
+                Safar dua
+              </Link>
+              <Link
+                href="/travel/wuzu-guide"
+                className="rounded-[14px] border border-orange-200 bg-orange-50/60 px-3 py-2.5 text-center text-sm font-semibold text-orange-700 transition hover:bg-orange-100"
+              >
+                Wuzu tarika
+              </Link>
+              <Link
+                href="/travel/qasar-namaz-guide"
+                className="rounded-[14px] border border-orange-200 bg-orange-50/60 px-3 py-2.5 text-center text-sm font-semibold text-orange-700 transition hover:bg-orange-100"
+              >
+                Qasar namaz
+              </Link>
+              <Link
+                href="/travel/namaz-in-airplane"
+                className="rounded-[14px] border border-orange-200 bg-orange-50/60 px-3 py-2.5 text-center text-sm font-semibold text-orange-700 transition hover:bg-orange-100"
+              >
+                In-flight namaz
+              </Link>
+            </div>
+            <Link
+              href="/travel"
+              className="rounded-full border border-blue-300 bg-blue-50 px-4 py-2.5 text-center text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+            >
+              Explore all travel guides
+            </Link>
+          </div>
+        )}
+      </section>
+
       <section className="z-20 rounded-[24px] border border-stone-200 bg-white/95 p-3 shadow-[0_12px_40px_rgba(41,37,36,0.08)] backdrop-blur xl:sticky xl:top-3">
         {mode === "nearby" && showLocationPrompt && nearbySource !== "current" ? (
           <div className={`mb-3 rounded-[14px] border px-3 py-2.5 text-xs text-stone-700 ${theme.promptWrap}`}>
@@ -922,36 +957,82 @@ export function HomeShell() {
           </div>
         ) : null}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[0.8fr_1.2fr]">
-          <div className="hidden -mx-1 rounded-[20px] bg-white/95 px-1 py-1 shadow-[0_8px_24px_rgba(41,37,36,0.08)] backdrop-blur sm:block sm:mx-0 sm:px-0 sm:py-0 sm:shadow-none">
-            <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setMode("nearby");
-                setActiveSuggestionField(null);
-              }}
-              className={`min-h-11 rounded-[16px] px-4 text-sm font-semibold transition ${
-                mode === "nearby"
-                  ? theme.modeActive
-                  : theme.modeInactive
-              }`}
-            >
-              Nearby
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode("route");
-                setActiveSuggestionField(null);
-              }}
-              className={`min-h-11 rounded-[16px] px-4 text-sm font-semibold transition ${
-                mode === "route"
-                  ? theme.modeActive
-                  : theme.modeInactive
-              }`}
-            >
-              Route
-            </button>
+          {/* Desktop 4-tab nav — mirrors the mobile bottom bar */}
+          <div className="hidden sm:block">
+            <div className="grid grid-cols-4 gap-1.5 rounded-[18px] border border-stone-100 bg-stone-50/80 p-1.5">
+              {/* Nearby */}
+              <button
+                type="button"
+                onClick={() => { setMode("nearby"); setActiveSuggestionField(null); }}
+                className={`flex flex-col items-center gap-1 rounded-[13px] px-2 py-2 text-[11px] font-semibold transition-all ${
+                  mode === "nearby"
+                    ? "bg-white text-blue-600 shadow-sm"
+                    : "text-stone-500 hover:text-stone-800"
+                }`}
+              >
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={mode === "nearby" ? 2.2 : 1.75}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 2C8.686 2 6 4.686 6 8c0 4.97 5.333 10.621 5.553 10.854a.643.643 0 0 0 .894 0C12.667 18.621 18 12.97 18 8c0-3.314-2.686-6-6-6z" />
+                  <circle cx="12" cy="8" r="2" strokeLinecap="round" strokeLinejoin="round" />
+                  {mode === "nearby" && <circle cx="12" cy="8" r="2" fill="currentColor" stroke="none" />}
+                </svg>
+                <span>Nearby</span>
+              </button>
+
+              {/* Route */}
+              <button
+                type="button"
+                onClick={() => { setMode("route"); setActiveSuggestionField(null); }}
+                className={`flex flex-col items-center gap-1 rounded-[13px] px-2 py-2 text-[11px] font-semibold transition-all ${
+                  mode === "route"
+                    ? "bg-white text-blue-600 shadow-sm"
+                    : "text-stone-500 hover:text-stone-800"
+                }`}
+              >
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={mode === "route" ? 2.2 : 1.75}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 17c0-1.7 1.3-3 3-3h10c1.7 0 3-1.3 3-3S18.7 8 17 8H7C5.3 8 4 6.7 4 5" />
+                  <circle cx="4" cy="5" r="1.5" fill={mode === "route" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5" />
+                  <circle cx="20" cy="17" r="1.5" fill={mode === "route" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5" />
+                </svg>
+                <span>Route</span>
+              </button>
+
+              {/* Flight */}
+              <Link
+                href="/flight"
+                className="flex flex-col items-center gap-1 rounded-[13px] px-2 py-2 text-[11px] font-semibold text-stone-500 transition-all hover:bg-white hover:text-stone-800 hover:shadow-sm"
+              >
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2v0A1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" />
+                </svg>
+                <span>Flight</span>
+              </Link>
+
+              {/* Suggest → WhatsApp */}
+              <a
+                href="https://wa.me/918421222893"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-col items-center gap-1 rounded-[13px] px-2 py-2 text-[11px] font-semibold text-stone-500 transition-all hover:bg-white hover:text-emerald-700 hover:shadow-sm"
+              >
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z" />
+                </svg>
+                <span>Suggest</span>
+              </a>
+            </div>
+
+            {/* Travel links row below buttons */}
+            <div className="rounded-[14px] border border-stone-200 bg-stone-50/60 px-3 py-2">
+              <div className="flex flex-wrap items-center justify-between gap-2.5">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-500">Travel guides</p>
+                <div className="flex flex-wrap gap-1.5">
+                  <Link href="/travel/safar-dua" className="inline-flex items-center rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-stone-700 transition hover:border-stone-300 hover:bg-stone-100">Safar dua</Link>
+                  <Link href="/travel/wuzu-guide" className="inline-flex items-center rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-stone-700 transition hover:border-stone-300 hover:bg-stone-100">Wuzu</Link>
+                  <Link href="/travel/qasar-namaz-guide" className="inline-flex items-center rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-stone-700 transition hover:border-stone-300 hover:bg-stone-100">Qasar</Link>
+                  <Link href="/travel/namaz-in-airplane" className="inline-flex items-center rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-stone-700 transition hover:border-stone-300 hover:bg-stone-100">In-flight</Link>
+                  <Link href="/travel" className="inline-flex items-center rounded-full border border-stone-300 bg-stone-100 px-2.5 py-1 text-[11px] font-semibold text-stone-700 transition hover:bg-stone-200">More</Link>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1482,7 +1563,7 @@ export function HomeShell() {
             </div>
           </div>
 
-          <div className="grid gap-4">
+          <div className="grid gap-4 justify-items-center">
             {visibleMosques.length > 0 ? (
               visibleMosques.map((mosque) => (
                 <MosqueCard
@@ -1550,6 +1631,71 @@ export function HomeShell() {
         </div>
       </footer>
     </div>
+
+    {/* ── Mobile bottom nav ── fixed outside the scroll container so iOS Safari honours position:fixed */}
+    <div className="fixed inset-x-0 bottom-0 z-50 sm:hidden">
+      <div className="border-t border-stone-200/80 bg-white/95 backdrop-blur-md">
+        <nav className="grid grid-cols-4" aria-label="Main navigation">
+          {/* Nearby */}
+          <button
+            type="button"
+            onClick={() => { setMode("nearby"); setActiveSuggestionField(null); }}
+            className={`flex flex-col items-center gap-1 px-2 py-3 text-[11px] font-semibold transition-colors ${
+              mode === "nearby" ? "text-blue-600" : "text-stone-400"
+            }`}
+          >
+            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={mode === "nearby" ? 2 : 1.75}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 2C8.686 2 6 4.686 6 8c0 4.97 5.333 10.621 5.553 10.854a.643.643 0 0 0 .894 0C12.667 18.621 18 12.97 18 8c0-3.314-2.686-6-6-6z" />
+              <circle cx="12" cy="8" r="2" strokeLinecap="round" strokeLinejoin="round" />
+              {mode === "nearby" && <circle cx="12" cy="8" r="2" fill="currentColor" stroke="none" />}
+            </svg>
+            <span>Nearby</span>
+          </button>
+
+          {/* Route */}
+          <button
+            type="button"
+            onClick={() => { setMode("route"); setActiveSuggestionField(null); }}
+            className={`flex flex-col items-center gap-1 px-2 py-3 text-[11px] font-semibold transition-colors ${
+              mode === "route" ? "text-blue-600" : "text-stone-400"
+            }`}
+          >
+            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={mode === "route" ? 2 : 1.75}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 17c0-1.7 1.3-3 3-3h10c1.7 0 3-1.3 3-3S18.7 8 17 8H7C5.3 8 4 6.7 4 5" />
+              <circle cx="4" cy="5" r="1.5" fill={mode === "route" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5" />
+              <circle cx="20" cy="17" r="1.5" fill={mode === "route" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5" />
+            </svg>
+            <span>Route</span>
+          </button>
+
+          {/* Flight */}
+          <Link
+            href="/flight"
+            className="flex flex-col items-center gap-1 px-2 py-3 text-[11px] font-semibold text-stone-400 transition-colors hover:text-stone-600"
+          >
+            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2v0A1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" />
+            </svg>
+            <span>Flight</span>
+          </Link>
+
+          {/* Suggest → WhatsApp */}
+          <a
+            href="https://wa.me/918421222893"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex flex-col items-center gap-1 px-2 py-3 text-[11px] font-semibold text-stone-400 transition-colors hover:text-emerald-600"
+          >
+            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z" />
+            </svg>
+            <span>Suggest</span>
+          </a>
+        </nav>
+        <div style={{ height: "env(safe-area-inset-bottom)" }} />
+      </div>
+    </div>
+    </>
   );
 }
 

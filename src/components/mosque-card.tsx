@@ -54,7 +54,7 @@ export function MosqueCard({ mosque, onAddTimings, isCreating = false }: MosqueC
   }, [selectedImageIndex, mosque.images.length]);
 
   return (
-    <article className="rounded-[26px] border border-stone-200 bg-white p-4 shadow-[0_12px_40px_rgba(41,37,36,0.08)] sm:p-5">
+    <article className="w-full max-w-[92vw] rounded-[26px] border border-stone-200 bg-white p-4 shadow-[0_12px_40px_rgba(41,37,36,0.08)] sm:max-w-none sm:p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 space-y-1.5">
           <h3 className="truncate text-lg font-semibold tracking-tight text-stone-900 sm:text-xl">
@@ -113,25 +113,25 @@ export function MosqueCard({ mosque, onAddTimings, isCreating = false }: MosqueC
         )}
       </div>
 
-      <div className="mt-4 flex gap-2">
+      <div className="mt-4 grid grid-cols-2 gap-2 md:flex">
         <a
           href={directionsUrl}
           target="_blank"
           rel="noopener noreferrer"
           onClick={() => trackEvent("navigate_click", { mosque_name: mosque.name, location: "card" })}
-          className="inline-flex flex-1 min-h-11 items-center justify-center rounded-full bg-[linear-gradient(135deg,#4f46e5_0%,#315ae9_42%,#2563eb_100%)] px-3 text-sm font-semibold !text-white visited:!text-white shadow-[0_8px_18px_rgba(30,64,175,0.18)] transition hover:brightness-[0.98]"
+          className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[linear-gradient(135deg,#4f46e5_0%,#315ae9_42%,#2563eb_100%)] px-3 text-sm font-semibold !text-white visited:!text-white shadow-[0_8px_18px_rgba(30,64,175,0.18)] transition hover:brightness-[0.98] md:flex-1"
         >
           Navigate
         </a>
 
-        <Link
-          href={`/masjid/${buildMasjidSlug(mosque)}`}
-          className="inline-flex flex-1 min-h-11 items-center justify-center rounded-full border border-stone-300 px-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
-        >
-          Masjid page
-        </Link>
-
-        {!mosque.hasJamaatData && onAddTimings ? (
+        {mosque.hasJamaatData ? (
+          <Link
+            href={`/masjid/${buildMasjidSlug(mosque)}`}
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-stone-300 px-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 md:flex-1"
+          >
+            Masjid page
+          </Link>
+        ) : onAddTimings ? (
           <button
             type="button"
             onClick={() => {
@@ -139,7 +139,7 @@ export function MosqueCard({ mosque, onAddTimings, isCreating = false }: MosqueC
               onAddTimings?.(mosque);
             }}
             disabled={isCreating}
-            className="inline-flex flex-1 min-h-11 items-center justify-center rounded-full border border-stone-300 px-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-70"
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-stone-300 px-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-70 md:flex-1"
           >
             {isCreating ? "Creating..." : "Add timings"}
           </button>
@@ -147,7 +147,7 @@ export function MosqueCard({ mosque, onAddTimings, isCreating = false }: MosqueC
           <button
             type="button"
             onClick={() => setIsExpanded((current) => !current)}
-            className="inline-flex flex-1 min-h-11 items-center justify-center rounded-full border border-stone-300 px-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-stone-300 px-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 md:flex-1"
           >
             {isExpanded ? "Hide details" : "View details"}
           </button>

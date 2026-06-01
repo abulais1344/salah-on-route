@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 
 import { formatDisplayTime } from "@/lib/jamaat";
 import { UpdateForm } from "@/components/update-form";
@@ -7,6 +8,14 @@ import { getMosqueByQrToken } from "@/lib/mosques";
 import type { MosqueView } from "@/types/mosque";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+    noimageindex: true,
+  },
+};
 
 export default async function UpdatePage({
   params,

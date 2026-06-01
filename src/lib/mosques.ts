@@ -1,39 +1,4 @@
-// ...existing code...
-// Add a helper to get Jummah landing data for a location
 import { demoMosques } from "./demo-data";
-
-export async function getJummahLandingData(location: string) {
-  // For demo: match city/locality from slug
-  const all = demoMosques;
-  const loc = location.toLowerCase();
-  const masjids = all.filter((m) =>
-    m.city?.toLowerCase() === loc ||
-    m.locality?.toLowerCase() === loc ||
-    `${m.city?.toLowerCase()}/${m.locality?.toLowerCase()}` === loc
-  );
-  if (!masjids.length) return null;
-  const formatLastUpdated = (iso: string | undefined) => {
-    if (!iso) return "-";
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return "-";
-    return d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
-  return {
-    displayName: location.split("/").map((s) => s[0]?.toUpperCase() + s.slice(1)).join(", "),
-    lastUpdatedDisplay: formatLastUpdated(masjids[0]?.lastUpdated),
-    masjids: masjids.map((m) => ({
-      id: m.id,
-      name: m.name,
-      address: m.address,
-      qrToken: m.qrToken,
-      latitude: m.latitude,
-      longitude: m.longitude,
-      placeId: m.placeId ?? null,
-      jummah: m.juma1 || null,
-      lastUpdatedDisplay: formatLastUpdated(m.lastUpdated),
-    })),
-  };
-}
 import { haversineDistanceKm } from "@/lib/geo";
 import {
   getNextJamaat,
@@ -55,6 +20,115 @@ import type {
   MosqueView,
   UpdateMosquePayload,
 } from "@/types/mosque";
+
+// Add a helper to get Jummah landing data for a location
+
+function toSlug(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function inferCitySlugFromAddress(address: string) {
+  const normalized = address.toLowerCase();
+  const cityHints = [
+    "ardhapur",
+    "nanded",
+    "hyderabad",
+    "pune",
+    "solapur",
+    "latur",
+    "parbhani",
+    "nizamabad",
+    "kamareddy",
+    "zaheerabad",
+    "maharashtra",
+    "telangana",
+  ];
+
+  const matched = cityHints.find((city) => normalized.includes(city));
+  if (matched) {
+    return matched;
+  }
+
+  const tokens = address
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const guessed = tokens.at(-2) || tokens.at(-1) || "india";
+  return toSlug(guessed);
+}
+
+function formatLastUpdated(iso: string | undefined) {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+export async function getJummahLandingData(location: string) {
+  const loc = location
+    .toLowerCase()
+    .split("/")
+    .map((segment) => toSlug(segment.replace(/-/g, " ")))
+    .filter(Boolean);
+
+  if (loc.length === 0) {
+    return null;
+  }
+
+  const all = await listMosqueRecords();
+  const jummahMosques = all.filter((m) => Boolean(m.juma1 || m.juma2));
+
+  const masjids = jummahMosques.filter((m) => {
+    const citySlug = inferCitySlugFromAddress(m.address);
+    const addressSlug = toSlug(m.address);
+
+    if (loc.length === 1) {
+      return citySlug === loc[0] || addressSlug.includes(loc[0]);
+    }
+
+    const [cityPart, localityPart] = loc;
+    return citySlug === cityPart && addressSlug.includes(localityPart);
+  });
+
+  if (!masjids.length) {
+    return null;
+  }
+
+  const latestUpdated = masjids.reduce((latest, m) => {
+    const timestamp = new Date(m.lastUpdated).getTime();
+    return Number.isNaN(timestamp) ? latest : Math.max(latest, timestamp);
+  }, 0);
+
+  const displayName = loc
+    .map((segment) => segment.split("-").map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(" "))
+    .join(", ");
+
+  return {
+    displayName,
+    lastUpdatedDisplay: latestUpdated ? formatLastUpdated(new Date(latestUpdated).toISOString()) : "-",
+    masjids: masjids
+      .sort((a, b) => {
+        if (Boolean(a.juma1) !== Boolean(b.juma1)) {
+          return a.juma1 ? -1 : 1;
+        }
+        return a.name.localeCompare(b.name);
+      })
+      .map((m) => ({
+        id: m.id,
+        name: m.name,
+        address: m.address,
+        qrToken: m.qrToken,
+        latitude: m.latitude,
+        longitude: m.longitude,
+        placeId: m.placeId ?? null,
+        jummah: m.juma1 || m.juma2 || null,
+        lastUpdatedDisplay: formatLastUpdated(m.lastUpdated),
+      })),
+  };
+}
 
 interface MosqueRow {
   id: string;
@@ -103,8 +177,6 @@ export async function listMosques(options?: {
   radiusKm?: number;
 }) {
   const mosques = await listMosqueRecords();
-
-// (removed duplicate import)
   const decorated = mosques.map((mosque) => decorateMosque(mosque, options));
   return decorated
     .filter((mosque) => {

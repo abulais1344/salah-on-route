@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Manrope, Noto_Nastaliq_Urdu, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { Analytics } from "@/components/analytics";
+import { SiteNav } from "@/components/site-nav";
 import { SITE_ALT_NAME, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site-meta";
 
 const manrope = Manrope({
@@ -106,7 +107,8 @@ export default function RootLayout({
       className={`${manrope.variable} ${spaceGrotesk.variable} ${notoNastaliqUrdu.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        {children}
+        <SiteNav />
+        <div className="overflow-x-hidden flex-1 flex flex-col">{children}</div>
         <Analytics />
       </body>
     </html>

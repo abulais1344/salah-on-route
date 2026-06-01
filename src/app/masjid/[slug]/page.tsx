@@ -48,12 +48,22 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title,
     description,
+    keywords: [
+      mosque.name,
+      city,
+      "namaz timings",
+      "jummah timings",
+      "masjid near me",
+      "mosque on route",
+      "travel prayer",
+    ],
     alternates: { canonical: `/masjid/${slug}` },
     openGraph: {
       title,
       description,
       url: `${SITE_URL}/masjid/${slug}`,
       type: "article",
+      modifiedTime: mosque.lastUpdated,
       images: [{ url: mosque.images[0]?.imageUrl || `${SITE_URL}/favicon-512.png` }],
     },
     twitter: {

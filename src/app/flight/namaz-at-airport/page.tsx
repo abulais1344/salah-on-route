@@ -6,9 +6,44 @@ export const metadata: Metadata = {
   description:
     "Learn where to offer namaz at airports, how to use prayer rooms, and how much gate buffer to keep before boarding.",
   alternates: { canonical: "/flight/namaz-at-airport" },
+  keywords: [
+    "namaz at airport",
+    "airport prayer room",
+    "airport namaz",
+    "flight prayer room",
+    "airport masjid",
+    "prayer at airport",
+    "airport prayer guide",
+  ],
+  openGraph: {
+    title: "Namaz at Airport Guide",
+    description:
+      "Learn where to offer namaz at airports, how to use prayer rooms, and how much gate buffer to keep before boarding.",
+    url: "/flight/namaz-at-airport",
+    type: "article",
+  },
+  twitter: {
+    card: "summary",
+    title: "Namaz at Airport Guide",
+    description:
+      "Learn where to offer namaz at airports, how to use prayer rooms, and how much gate buffer to keep before boarding.",
+  },
 };
 
 export default function NamazAtAirportGuidePage() {
+  const howToJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    name: "How to pray at an airport",
+    description: "Quick airport prayer workflow for Muslim travellers.",
+    step: [
+      { "@type": "HowToStep", name: "Check boarding time", text: "Confirm your gate and boarding window first." },
+      { "@type": "HowToStep", name: "Use terminal prayer room", text: "Use the airport prayer room if it is available." },
+      { "@type": "HowToStep", name: "Keep buffer", text: "Return to the gate with at least 25 to 45 minutes remaining." },
+      { "@type": "HowToStep", name: "Choose nearby masjid only if safe", text: "Leave the terminal only if your layover is long enough and transport is reliable." },
+    ],
+  };
+
   const faqJsonLd = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
@@ -42,6 +77,7 @@ export default function NamazAtAirportGuidePage() {
 
   return (
     <main className="min-h-screen px-4 py-8 sm:px-6 lg:px-8">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(howToJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
       <div className="mx-auto w-full max-w-4xl space-y-5">
         <header className="rounded-[22px] border border-stone-200 bg-white p-5">

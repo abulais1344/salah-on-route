@@ -303,6 +303,13 @@ function getToneClasses(tone: Tone) {
   return "border-rose-200 bg-rose-50 text-rose-900";
 }
 
+function formatMinutes(min: number): string {
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m === 0 ? `${h} hr` : `${h} hr ${m} min`;
+}
+
 function getLayoverAdvice(hours: number): LayoverAdvice {
   const minutes = Math.round(hours * 60);
 
@@ -395,7 +402,7 @@ function buildTimeline(
       title: `Offer namaz at ${departureCode} terminal prayer room`,
       detail:
         minutesToDeparture > 0
-          ? `Time to departure: ${minutesToDeparture} min. Keep wudu + gate buffer in mind.`
+          ? `Time to departure: ${formatMinutes(minutesToDeparture)}. Keep wudu + gate buffer in mind.`
           : "Departure time has passed. Recheck current flight time before acting.",
       tone: beforeTone,
     },
@@ -815,7 +822,7 @@ export function FlightPrayerPlanner({
               <p className="mt-1 text-sm opacity-90">{instantAction.detail}</p>
               {nextDeparturePrayer ? (
                 <p className="mt-2 text-sm font-semibold opacity-90">
-                  Next local prayer near departure: {nextDeparturePrayer.prayerName} in {nextDeparturePrayer.minutesLeft} min
+                  Next local prayer near departure: {nextDeparturePrayer.prayerName} in {formatMinutes(nextDeparturePrayer.minutesLeft)}
                 </p>
               ) : null}
               <Link
@@ -827,25 +834,18 @@ export function FlightPrayerPlanner({
             </section>
           ) : null}
 
-          <section className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-[18px] border border-stone-200 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">Departure</p>
-              <p className="mt-2 text-base font-semibold text-stone-900">{departureAirport?.city} ({departureCode})</p>
-              <p className="mt-1 text-sm text-stone-600">{plan.departureLocalIso}</p>
+          <section className="rounded-[18px] border border-stone-200 bg-white px-4 py-3">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+              <span className="text-base font-semibold text-stone-900">{departureAirport?.city} ({departureCode})</span>
+              <svg className="h-4 w-4 shrink-0 text-stone-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 6l6 6-6 6" /></svg>
+              <span className="text-base font-semibold text-stone-900">{arrivalAirport?.city} ({arrivalCode})</span>
             </div>
-            <div className="rounded-[18px] border border-stone-200 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">Arrival</p>
-              <p className="mt-2 text-base font-semibold text-stone-900">{arrivalAirport?.city} ({arrivalCode})</p>
-              <p className="mt-1 text-sm text-stone-600">{plan.arrivalLocalIso}</p>
-            </div>
-            <div className="rounded-[18px] border border-stone-200 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">Time shift</p>
-              <p className="mt-2 text-base font-semibold text-stone-900">
-                {plan.crossingTimezoneHours >= 0 ? "+" : ""}
-                {plan.crossingTimezoneHours} hrs
-              </p>
-              <p className="mt-1 text-sm text-stone-600">Flight duration: {plan.durationHours.toFixed(1)} hrs</p>
-            </div>
+            <p className="mt-1 text-sm text-stone-500">
+              {plan.departureLocalIso} → {plan.arrivalLocalIso}
+              {" · "}
+              {plan.crossingTimezoneHours >= 0 ? "+" : ""}{plan.crossingTimezoneHours} hrs timezone
+            </p>
+            <p className="mt-0.5 text-xs text-stone-400">Flight duration: {Number.isInteger(plan.durationHours) ? plan.durationHours : plan.durationHours.toFixed(1)} hrs</p>
           </section>
 
           <section id="journey-timeline" className="rounded-[22px] border border-stone-200 bg-white p-4 sm:p-5">
@@ -854,14 +854,23 @@ export function FlightPrayerPlanner({
               Follow this sequence to quickly decide where to offer namaz during travel.
             </p>
 
-            <div className="mt-3 space-y-3">
-              {timeline.map((step) => (
-                <article key={step.phase} className={`rounded-xl border p-3 ${getToneClasses(step.tone)}`}>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em]">{step.phase}</p>
-                  <p className="mt-1 text-sm font-semibold">{step.title}</p>
-                  <p className="mt-1 text-sm opacity-90">{step.detail}</p>
-                </article>
-              ))}
+            <div className="relative mt-4 pl-9">
+              <div className="absolute left-4 top-3 bottom-2 w-0.5 bg-stone-200" />
+              {timeline.map((step) => {
+                const dotColor = step.tone === "green"
+                  ? "bg-emerald-500"
+                  : step.tone === "amber"
+                  ? "bg-amber-400"
+                  : "bg-rose-500";
+                return (
+                  <div key={step.phase} className="relative mb-6 last:mb-0">
+                    <div className={`absolute -left-[26px] top-[3px] h-3.5 w-3.5 rounded-full shadow-sm ${dotColor}`} />
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400">{step.phase}</p>
+                    <p className="mt-0.5 text-sm font-semibold text-stone-900">{step.title}</p>
+                    <p className="mt-0.5 text-sm leading-relaxed text-stone-500">{step.detail}</p>
+                  </div>
+                );
+              })}
             </div>
           </section>
 
